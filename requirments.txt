@@ -3,3 +3,4 @@ psycopg2-binary>=2.9.0 # For PostgreSQL connection
 pytz>=2023.3 # For timezone handling
 pandas>=1.5.0 # For displaying dataframes
 psycopg2>=2.9.0 # Added psycopg2 explicitly for pool support if needed, though binary often suffices
+git init

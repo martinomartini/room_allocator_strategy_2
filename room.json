@@ -1,0 +1,14 @@
+[
+    { "name": "C07.01 (sta-zit)", "capacity": 4 },
+    { "name": "C07.03", "capacity": 4 },
+    { "name": "C07.09", "capacity": 4 },
+    { "name": "C07.11 (sta-zit)", "capacity": 6 },
+    { "name": "C07.13 (sta-zit)", "capacity": 4 },
+    { "name": "C07.15", "capacity": 8 },
+    { "name": "C07.10", "capacity": 4 },
+    { "name": "C07.12", "capacity": 4 },
+    { "name": "C07.18", "capacity": 4 },
+    { "name": "C07.19", "capacity": 3 },
+    { "name": "C07.20", "capacity": 4 },
+    { "name": "C07.24", "capacity": 8 }
+  ]

@@ -1,0 +1,40 @@
+name: Daily Reservation Reset
+
+on:
+  schedule:
+    # Runs at 18:00 UTC daily. Adjust cron syntax as needed for your desired reset time.
+    # Example: '0 18 * * *' for 6 PM UTC
+    # Make sure this matches your desired reset time in UTC.
+    - cron: '0 18 * * *' # 18:00 UTC
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  reset-database:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client --no-install-recommends
+
+      - sname: Clear Reservations Table
+        env:
+          # IMPORTANT: Set this secret in your GitHub repo settings:
+          # Settings -> Secrets and variables -> Actions -> Repository secrets -> New repository secret
+          SUPABASE_DB_URI: ${{ secrets.SUPABASE_DB_URI }}
+        run: |
+          if [ -z "$SUPABASE_DB_URI" ]; then
+            echo "Error: SUPABASE_DB_URI secret is not set in GitHub Actions secrets."
+            exit 1
+          fi
+          echo "Connecting to database and clearing reservations table..."
+          # Extract password safely - assumes standard postgres URI format: postgresql://user:password@host:port/database
+          PGPASSWORD=$(echo "$SUPABASE_DB_URI" | awk -F':' '{print $3}' | awk -F'@' '{print $1}')
+          export PGPASSWORD
+          # Execute the command to truncate the table
+          psql "$SUPABASE_DB_URI" -c "TRUNCATE TABLE reservations RESTART IDENTITY;"
+          # Check exit code of psql
+          if [ $? -eq 0 ]; then
+            echo "Reservations table cleared successfully."
+          else
+            echo "Error: Failed to clear reservations table. Check DB connection and permissions."
+            exit 1
+          fi
