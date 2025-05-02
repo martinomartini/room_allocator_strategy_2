@@ -2,11 +2,8 @@ name: Daily Reservation Reset
 
 on:
   schedule:
-    # Runs at 18:00 UTC daily. Adjust cron syntax as needed for your desired reset time.
-    # Example: '0 18 * * *' for 6 PM UTC
-    # Make sure this matches your desired reset time in UTC.
-    - cron: '0 18 * * *' # 18:00 UTC
-  workflow_dispatch: # Allows manual triggering
+    - cron: '0 16 * * *'  # 16:00 UTC = 18:00 Europe/Amsterdam
+  workflow_dispatch:       # Allow manual trigger from Actions tab
 
 jobs:
   reset-database:
@@ -17,24 +14,40 @@ jobs:
 
       - name: Clear Reservations Table
         env:
-          # IMPORTANT: Set this secret in your GitHub repo settings:
-          # Settings -> Secrets and variables -> Actions -> Repository secrets -> New repository secret
           SUPABASE_DB_URI: ${{ secrets.SUPABASE_DB_URI }}
         run: |
           if [ -z "$SUPABASE_DB_URI" ]; then
-            echo "Error: SUPABASE_DB_URI secret is not set in GitHub Actions secrets."
+            echo "❌ Error: SUPABASE_DB_URI is not set in GitHub Secrets."
             exit 1
           fi
-          echo "Connecting to database and clearing reservations table..."
-          # Extract password safely - assumes standard postgres URI format: postgresql://user:password@host:port/database
-          PGPASSWORD=$(echo "$SUPABASE_DB_URI" | awk -F':' '{print $3}' | awk -F'@' '{print $1}')
+
+          echo "🔗 Connecting to Supabase and clearing the reservations table..."
+
+          # Extract connection components
+          PGPASSWORD=$(echo "$SUPABASE_DB_URI" | sed -E 's|.*//[^:]+:([^@]+)@.*|\1|')
+          PGUSER=$(echo "$SUPABASE_DB_URI" | sed -E 's|.*//([^:]+):.*|\1|')
+          PGHOST=$(echo "$SUPABASE_DB_URI" | sed -E 's|.*@([^:/]+).*|\1|')
+          PGPORT=$(echo "$SUPABASE_DB_URI" | sed -E 's|.*:([0-9]+)/.*|\1|')
+          PGDATABASE=$(echo "$SUPABASE_DB_URI" | sed -E 's|.*/([^?]+).*|\1|')
+
           export PGPASSWORD
-          # Execute the command to truncate the table
-          psql "$SUPABASE_DB_URI" -c "TRUNCATE TABLE reservations RESTART IDENTITY;"
-          # Check exit code of psql
+
+          echo "ℹ️ Host: $PGHOST"
+          echo "ℹ️ Database: $PGDATABASE"
+          echo "ℹ️ User: $PGUSER"
+
+          # Execute the TRUNCATE command
+          psql \
+            --host="$PGHOST" \
+            --port="$PGPORT" \
+            --username="$PGUSER" \
+            --dbname="$PGDATABASE" \
+            -c "TRUNCATE TABLE reservations RESTART IDENTITY;" \
+            "sslmode=require"
+
           if [ $? -eq 0 ]; then
-            echo "Reservations table cleared successfully."
+            echo "✅ Reservations table cleared successfully."
           else
-            echo "Error: Failed to clear reservations table. Check DB connection and permissions."
+            echo "❌ Error: Failed to clear reservations table."
             exit 1
           fi
