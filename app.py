@@ -93,7 +93,7 @@ today_str = now_local.strftime('%Y-%m-%d')
 st.info(f"""
 Current Office Time ({OFFICE_TIMEZONE_STR}): **{now_local.strftime('%Y-%m-%d %H:%M:%S')}**
 
-Reservations are **🟢 always open**, and reset daily at 18:00 (office time).
+Reservations are **🟢 always open**, and reset daily at 20:00 (office time).
 """)
 
 st.header("Make a Reservation")
