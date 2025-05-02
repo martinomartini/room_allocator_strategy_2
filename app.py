@@ -186,4 +186,4 @@ else:
     st.dataframe(reservations_df, hide_index=True, use_container_width=True)
 
 st.divider()
-st.caption("System resets daily at 18:00. You can reserve rooms anytime, subject to availability.")
+st.caption("System resets daily at 20:00. You can reserve rooms anytime, subject to availability.")
