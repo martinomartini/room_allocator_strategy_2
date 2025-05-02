@@ -53,7 +53,7 @@ def return_connection_to_pool(pool, conn):
     except:
         pass
 
-def get_current_reservations_df(pool):
+def get_current_reservations_df(pool, today_str):
     reservations = []
     conn = get_connection_from_pool(pool)
     if not conn:
@@ -64,8 +64,9 @@ def get_current_reservations_df(pool):
                 SELECT team_name, contact_person, team_size, assigned_room_name,
                        to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD HH24:MI') as reservation_time_local
                 FROM reservations
+                WHERE to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD') = %s
                 ORDER BY assigned_room_name ASC
-            """, (OFFICE_TIMEZONE_STR,))
+            """, (OFFICE_TIMEZONE_STR, OFFICE_TIMEZONE_STR, today_str))
             results = cur.fetchall()
             colnames = [desc[0] for desc in cur.description]
             reservations = [dict(zip(colnames, row)) for row in results]
@@ -87,6 +88,8 @@ st.set_page_config(page_title="Office Room Allocator", layout="centered")
 st.title("🏢 Office Room Allocator")
 
 now_local = datetime.now(OFFICE_TIMEZONE)
+today_str = now_local.strftime('%Y-%m-%d')
+
 st.info(f"""
 Current Office Time ({OFFICE_TIMEZONE_STR}): **{now_local.strftime('%Y-%m-%d %H:%M:%S')}**
 
@@ -95,12 +98,20 @@ Reservations are **🟢 always open**, and reset daily at 18:00 (office time).
 
 st.header("Make a Reservation")
 
-form_disabled = False  # Always enabled
+form_disabled = False
 
 with st.form("reservation_form", clear_on_submit=True):
     team_name = st.text_input("Your Team Name:", placeholder="e.g., Project Phoenix", disabled=form_disabled)
     contact_person = st.text_input("Contact Person:", placeholder="e.g., Jane Doe", disabled=form_disabled)
     team_size = st.number_input("Team Size (Number of People):", min_value=1, step=1, disabled=form_disabled)
+
+    # Preferred room dropdown with capacity in label
+    room_options = [f"{room['name']} ({room['capacity']} ppl)" for room in AVAILABLE_ROOMS]
+    room_name_lookup = {f"{room['name']} ({room['capacity']} ppl)": room['name'] for room in AVAILABLE_ROOMS}
+    preferred_room_label = st.selectbox(
+        "Preferred Room (optional):", options=["No preference"] + room_options, index=0, disabled=form_disabled
+    )
+    preferred_room = room_name_lookup.get(preferred_room_label, None)
 
     submitted = st.form_submit_button("Find and Reserve Room", disabled=form_disabled)
 
@@ -119,18 +130,30 @@ with st.form("reservation_form", clear_on_submit=True):
                     else:
                         try:
                             with conn.cursor() as cur:
-                                cur.execute("SELECT DISTINCT assigned_room_name FROM reservations")
+                                cur.execute("SELECT DISTINCT assigned_room_name FROM reservations WHERE to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD') = %s", (OFFICE_TIMEZONE_STR, today_str))
                                 taken = set(row[0] for row in cur.fetchall())
 
-                            suitable_rooms = sorted(
-                                [r for r in AVAILABLE_ROOMS if r['capacity'] >= team_size and r['name'] not in taken],
-                                key=lambda x: x['capacity']
-                            )
+                            # Filter available rooms by capacity and availability
+                            suitable_rooms = [
+                                r for r in AVAILABLE_ROOMS
+                                if r['capacity'] >= team_size and r['name'] not in taken
+                            ]
 
-                            if not suitable_rooms:
+                            assigned = None
+
+                            # Try preferred room if available
+                            if preferred_room:
+                                match = next((r for r in suitable_rooms if r["name"] == preferred_room), None)
+                                if match:
+                                    assigned = match['name']
+
+                            # Fallback to best match by capacity
+                            if not assigned and suitable_rooms:
+                                assigned = sorted(suitable_rooms, key=lambda x: x['capacity'])[0]['name']
+
+                            if not assigned:
                                 st.error(f"No available room found for a team of {team_size}.")
                             else:
-                                assigned = suitable_rooms[0]['name']
                                 with conn.cursor() as cur:
                                     cur.execute(
                                         "INSERT INTO reservations (team_name, contact_person, team_size, assigned_room_name) VALUES (%s, %s, %s, %s)",
@@ -151,11 +174,11 @@ with st.form("reservation_form", clear_on_submit=True):
 
 st.divider()
 st.header("Current Reservations for Today")
-st.caption(f"Showing reservations for {now_local.strftime('%Y-%m-%d')}.")
+st.caption(f"Showing reservations for {today_str}.")
 
 with st.spinner("Loading current reservations..."):
     db_pool = get_db_connection_pool()
-    reservations_df = get_current_reservations_df(db_pool)
+    reservations_df = get_current_reservations_df(db_pool, today_str)
 
 if reservations_df.empty:
     st.write("No rooms reserved yet for today.")
