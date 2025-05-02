@@ -102,12 +102,6 @@ with st.form("reservation_form", clear_on_submit=True):
     contact_person = st.text_input("Contact Person:", placeholder="e.g., Jane Doe", disabled=form_disabled)
     team_size = st.number_input("Team Size (Number of People):", min_value=1, step=1, disabled=form_disabled)
 
-    # Preferred room dropdown
-    room_names = [room["name"] for room in AVAILABLE_ROOMS]
-    preferred_room = st.selectbox(
-        "Preferred Room (optional):", options=["No preference"] + room_names, index=0, disabled=form_disabled
-    )
-
     submitted = st.form_submit_button("Find and Reserve Room", disabled=form_disabled)
 
     if submitted:
@@ -128,27 +122,15 @@ with st.form("reservation_form", clear_on_submit=True):
                                 cur.execute("SELECT DISTINCT assigned_room_name FROM reservations")
                                 taken = set(row[0] for row in cur.fetchall())
 
-                            # Filter available rooms by capacity & availability
-                            suitable_rooms = [
-                                r for r in AVAILABLE_ROOMS
-                                if r['capacity'] >= team_size and r['name'] not in taken
-                            ]
+                            suitable_rooms = sorted(
+                                [r for r in AVAILABLE_ROOMS if r['capacity'] >= team_size and r['name'] not in taken],
+                                key=lambda x: x['capacity']
+                            )
 
-                            assigned = None
-
-                            # Try preferred room if selected
-                            if preferred_room != "No preference":
-                                match = next((r for r in suitable_rooms if r["name"] == preferred_room), None)
-                                if match:
-                                    assigned = match['name']
-
-                            # Fallback: first suitable room by smallest capacity
-                            if not assigned and suitable_rooms:
-                                assigned = sorted(suitable_rooms, key=lambda x: x['capacity'])[0]['name']
-
-                            if not assigned:
+                            if not suitable_rooms:
                                 st.error(f"No available room found for a team of {team_size}.")
                             else:
+                                assigned = suitable_rooms[0]['name']
                                 with conn.cursor() as cur:
                                     cur.execute(
                                         "INSERT INTO reservations (team_name, contact_person, team_size, assigned_room_name) VALUES (%s, %s, %s, %s)",
