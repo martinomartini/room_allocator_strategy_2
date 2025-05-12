@@ -1,9 +1,10 @@
+# app.py
 import streamlit as st
 import psycopg2
 import psycopg2.pool
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 
@@ -53,137 +54,77 @@ def return_connection_to_pool(pool, conn):
     except:
         pass
 
-def get_current_reservations_df(pool, today_str):
-    reservations = []
+def insert_preference(pool, team_name, contact_person, team_size, preferred_days):
     conn = get_connection_from_pool(pool)
-    if not conn:
-        return pd.DataFrame()
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT team_name, contact_person, team_size, assigned_room_name,
-                       to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD HH24:MI') as reservation_time_local
-                FROM reservations
-                WHERE to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD') = %s
-                ORDER BY assigned_room_name ASC
-            """, (OFFICE_TIMEZONE_STR, OFFICE_TIMEZONE_STR, today_str))
-            results = cur.fetchall()
-            colnames = [desc[0] for desc in cur.description]
-            reservations = [dict(zip(colnames, row)) for row in results]
-    except:
-        pass
+                INSERT INTO weekly_preferences (team_name, contact_person, team_size, preferred_days, submission_time)
+                VALUES (%s, %s, %s, %s, NOW())
+            """, (team_name, contact_person, team_size, preferred_days))
+            conn.commit()
+    except Exception as e:
+        st.error(f"Failed to save preference: {e}")
     finally:
         return_connection_to_pool(pool, conn)
 
-    if reservations:
-        df = pd.DataFrame(reservations)
-        df.columns = ["Team Name", "Contact", "Size", "Assigned Room", "Reserved At (Local)"]
-        return df
-    else:
+def get_allocations(pool):
+    conn = get_connection_from_pool(pool)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT team_name, room_name, date
+                FROM weekly_allocations
+                ORDER BY date, room_name
+            """)
+            data = cur.fetchall()
+            return pd.DataFrame(data, columns=["Team", "Room", "Date"])
+    except Exception as e:
+        st.warning("Failed to load allocation data.")
         return pd.DataFrame()
+    finally:
+        return_connection_to_pool(pool, conn)
 
 # --- Streamlit App UI ---
 
-st.set_page_config(page_title="Office Room Allocator", layout="centered")
-st.title("🏢 Office Room Allocator")
+st.set_page_config(page_title="Weekly Room Allocator", layout="centered")
+st.title("📅 Weekly Office Room Allocator")
 
 now_local = datetime.now(OFFICE_TIMEZONE)
-today_str = now_local.strftime('%Y-%m-%d')
+day_name = now_local.strftime('%A')
 
-st.info(f"""
-Current Office Time ({OFFICE_TIMEZONE_STR}): **{now_local.strftime('%Y-%m-%d %H:%M:%S')}**
+st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-Reservations are **🟢 always open**, and reset daily at 20:00 (office time).
-""")
+# --- Preference Form (Fridays only) ---
+if day_name == 'Friday':
+    st.header("Submit Your Preference for Next Week")
+    with st.form("weekly_preference_form"):
+        team_name = st.text_input("Team Name:")
+        contact_person = st.text_input("Contact Person:")
+        team_size = st.number_input("Team Size:", min_value=1)
+        preferred_days = st.radio("Preferred Office Days:", ["Mon + Wed", "Tue + Thu"])
 
-st.header("Make a Reservation")
-
-form_disabled = False
-
-with st.form("reservation_form", clear_on_submit=True):
-    team_name = st.text_input("Your Team Name:", placeholder="e.g., Project Phoenix", disabled=form_disabled)
-    contact_person = st.text_input("Contact Person:", placeholder="e.g., Jane Doe", disabled=form_disabled)
-    team_size = st.number_input("Team Size (Number of People):", min_value=1, step=1, disabled=form_disabled)
-
-    # Preferred room dropdown with capacity in label
-    room_options = [f"{room['name']} ({room['capacity']} ppl)" for room in AVAILABLE_ROOMS]
-    room_name_lookup = {f"{room['name']} ({room['capacity']} ppl)": room['name'] for room in AVAILABLE_ROOMS}
-    preferred_room_label = st.selectbox(
-        "Preferred Room (optional):", options=["No preference"] + room_options, index=0, disabled=form_disabled
-    )
-    preferred_room = room_name_lookup.get(preferred_room_label, None)
-
-    submitted = st.form_submit_button("Find and Reserve Room", disabled=form_disabled)
-
-    if submitted:
-        if not team_name or not contact_person or team_size <= 0:
-            st.warning("⚠️ Please fill in all fields correctly.")
-        else:
-            with st.spinner("Checking availability..."):
+        submitted = st.form_submit_button("Submit Preference")
+        if submitted:
+            if not team_name or not contact_person:
+                st.warning("Please complete all fields.")
+            else:
                 db_pool = get_db_connection_pool()
-                if not db_pool:
-                    st.error("Database connection failed.")
-                else:
-                    conn = get_connection_from_pool(db_pool)
-                    if not conn:
-                        st.error("Could not get database connection.")
-                    else:
-                        try:
-                            with conn.cursor() as cur:
-                                cur.execute("SELECT DISTINCT assigned_room_name FROM reservations WHERE to_char(reservation_time AT TIME ZONE %s, 'YYYY-MM-DD') = %s", (OFFICE_TIMEZONE_STR, today_str))
-                                taken = set(row[0] for row in cur.fetchall())
+                if db_pool:
+                    insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
+                    st.success("✅ Preference submitted successfully!")
 
-                            # Filter available rooms by capacity and availability
-                            suitable_rooms = [
-                                r for r in AVAILABLE_ROOMS
-                                if r['capacity'] >= team_size and r['name'] not in taken
-                            ]
-
-                            assigned = None
-
-                            # Try preferred room if available
-                            if preferred_room:
-                                match = next((r for r in suitable_rooms if r["name"] == preferred_room), None)
-                                if match:
-                                    assigned = match['name']
-
-                            # Fallback to best match by capacity
-                            if not assigned and suitable_rooms:
-                                assigned = sorted(suitable_rooms, key=lambda x: x['capacity'])[0]['name']
-
-                            if not assigned:
-                                st.error(f"No available room found for a team of {team_size}.")
-                            else:
-                                with conn.cursor() as cur:
-                                    cur.execute(
-                                        "INSERT INTO reservations (team_name, contact_person, team_size, assigned_room_name) VALUES (%s, %s, %s, %s)",
-                                        (team_name, contact_person, team_size, assigned)
-                                    )
-                                conn.commit()
-                                st.success(f"✅ Reserved room '{assigned}' for team '{team_name}'!")
-                        except Exception as e:
-                            st.error(f"Reservation failed: {e}")
-                            try:
-                                conn.rollback()
-                            except:
-                                pass
-                        finally:
-                            return_connection_to_pool(db_pool, conn)
-
-# --- Current Reservations ---
-
-st.divider()
-st.header("Current Reservations for Today")
-st.caption(f"Showing reservations for {today_str}.")
-
-with st.spinner("Loading current reservations..."):
+# --- Weekly Allocation Display (Sat onward) ---
+elif day_name in ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']:
+    st.header("Room Allocations for This Week")
     db_pool = get_db_connection_pool()
-    reservations_df = get_current_reservations_df(db_pool, today_str)
-
-if reservations_df.empty:
-    st.write("No rooms reserved yet for today.")
-else:
-    st.dataframe(reservations_df, hide_index=True, use_container_width=True)
+    if db_pool:
+        df = get_allocations(db_pool)
+        if df.empty:
+            st.write("🔄 Allocations will appear here once available (every Saturday).")
+        else:
+            df["Date"] = pd.to_datetime(df["Date"]).dt.strftime('%A %Y-%m-%d')
+            st.dataframe(df, use_container_width=True)
 
 st.divider()
-st.caption("System resets daily at 20:00. You can reserve rooms anytime, subject to availability.")
+st.caption("🔄 Preferences open every Friday. Allocations are made automatically each Saturday.")
