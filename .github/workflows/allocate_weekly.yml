@@ -3,7 +3,7 @@ name: Weekly Room Allocation
 on:
   schedule:
     - cron: '1 0 * * 6'  # Every Saturday at 00:01 UTC
-  workflow_dispatch:     # Allow manual run if needed
+  workflow_dispatch:     # Allow manual run
 
 jobs:
   allocate:
@@ -25,6 +25,6 @@ jobs:
 
       - name: Run allocation script
         env:
-          SUPABASE_DB_URI: ${{ secrets.SUPABASE_DB_URI }}
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URI }}
           OFFICE_TIMEZONE: 'Europe/Amsterdam'
         run: python allocate_rooms.py
