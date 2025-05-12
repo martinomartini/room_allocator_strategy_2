@@ -95,8 +95,8 @@ day_name = now_local.strftime('%A')
 
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-# --- Preference Form (Fridays only) ---
-if day_name == 'Friday':
+# --- Preference Form (Fridays only) ---day_name == 'Friday':
+if True:
     st.header("Submit Your Preference for Next Week")
     with st.form("weekly_preference_form"):
         team_name = st.text_input("Team Name:")
