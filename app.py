@@ -95,8 +95,8 @@ day_name = now_local.strftime('%A')
 
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-# --- Preference Form (Fridays only) ---
-if day_name == 'Friday':
+# --- Preference Form (Fridays only) ---day_name == 'Friday'
+if True:
     st.header("Submit Your Preference for Next Week")
     with st.form("weekly_preference_form"):
         team_name = st.text_input("Team Name:")
@@ -104,7 +104,7 @@ if day_name == 'Friday':
         team_size = st.number_input("Team Size:", min_value=1)
         preferred_days = st.radio("Preferred Office Days:", ["Mon + Wed", "Tue + Thu"])
 
-        submitted = st.form_submit_button("Submit Preference")
+        submitted = st.form_submit_button("Submit Preferesnce")
         if submitted:
             if not team_name or not contact_person:
                 st.warning("Please complete all fields.")
