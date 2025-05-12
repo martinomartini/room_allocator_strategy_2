@@ -4,7 +4,7 @@ import psycopg2
 import psycopg2.pool
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 import pandas as pd
 
@@ -95,20 +95,27 @@ day_name = now_local.strftime('%A')
 
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-# --- Preference Form (Fridays only) ---day_name == 'Friday'
-if True:
+# --- Preference Form (Fridays only) ---
+if day_name == 'Friday':
     st.header("Submit Your Preference for Next Week")
     with st.form("weekly_preference_form"):
         team_name = st.text_input("Team Name:")
         contact_person = st.text_input("Contact Person:")
         team_size = st.number_input("Team Size:", min_value=1)
-        preferred_days = st.radio("Preferred Office Days:", ["Mon + Wed", "Tue + Thu"])
+        selected_days = st.multiselect(
+            "Select 2 preferred office days:",
+            ["Monday", "Tuesday", "Wednesday", "Thursday"],
+            max_selections=2
+        )
 
-        submitted = st.form_submit_button("Submit Preferesnce")
+        submitted = st.form_submit_button("Submit Preference")
         if submitted:
             if not team_name or not contact_person:
                 st.warning("Please complete all fields.")
+            elif len(selected_days) != 2:
+                st.warning("Please select exactly two days.")
             else:
+                preferred_days = ",".join(selected_days)
                 db_pool = get_db_connection_pool()
                 if db_pool:
                     insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
