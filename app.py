@@ -95,8 +95,8 @@ day_name = now_local.strftime('%A')
 
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-# --- Preference Form (Fridays only) ---day_name == 'Friday':
-if True:
+# --- Preference Form (Fridays only) ---
+if day_name == 'Friday':
     st.header("Submit Your Preference for Next Week")
     with st.form("weekly_preference_form"):
         team_name = st.text_input("Team Name:")
@@ -121,17 +121,16 @@ if True:
                     insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
                     st.success("✅ Preference submitted successfully!")
 
-# --- Weekly Allocation Display (Sat onward) ---
-elif day_name in ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']:
-    st.header("Room Allocations for This Week")
-    db_pool = get_db_connection_pool()
-    if db_pool:
-        df = get_allocations(db_pool)
-        if df.empty:
-            st.write("🔄 Allocations will appear here once available (every Saturday).")
-        else:
-            df["Date"] = pd.to_datetime(df["Date"]).dt.strftime('%A %Y-%m-%d')
-            st.dataframe(df, use_container_width=True)
+# --- Allocation Viewer (always show if data exists) ---
+st.header("Room Allocations for This Week")
+db_pool = get_db_connection_pool()
+if db_pool:
+    df = get_allocations(db_pool)
+    if df.empty:
+        st.write("🔄 No allocations found yet. Allocations will appear here once generated.")
+    else:
+        df["Date"] = pd.to_datetime(df["Date"]).dt.strftime('%A %Y-%m-%d')
+        st.dataframe(df, use_container_width=True)
 
 st.divider()
 st.caption("🔄 Preferences open every Friday. Allocations are made automatically each Saturday.")
