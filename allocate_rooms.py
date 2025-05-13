@@ -1,10 +1,9 @@
-# allocate_rooms.py
-
 import psycopg2
 import json
 import os
 from datetime import datetime, timedelta
 import pytz
+import random
 
 # --- Time Setup ---
 OFFICE_TIMEZONE = pytz.timezone("Europe/Amsterdam")
@@ -34,63 +33,63 @@ def run_allocation(database_url):
         # Clear old allocations
         cur.execute("DELETE FROM weekly_allocations")
 
-        # --- Team Allocation ---
+        # --- Load Team Preferences ---
         cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
         team_preferences = cur.fetchall()
-        used_rooms = {d: [] for d in day_mapping.values()}
+        random.shuffle(team_preferences)
 
+        used_rooms = {d: [] for d in day_mapping.values()}
+        team_to_days = {}
+        placed_once = set()
+
+        # First round: place each team once
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-            assigned_days = []
-
-            # Try preferred days first
-            for day_name in preferred_days:
-                date = day_mapping[day_name]
-                possible_rooms = sorted(
-                    [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
-                    key=lambda x: x['capacity']
-                )
-                if possible_rooms:
-                    room = possible_rooms[0]['name']
+            random.shuffle(preferred_days)
+            for day in preferred_days:
+                date = day_mapping[day]
+                available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
+                available = sorted(available, key=lambda r: r["capacity"])
+                if available:
+                    room = available[0]["name"]
                     cur.execute(
                         "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                         (team_name, room, date)
                     )
                     used_rooms[date].append(room)
-                    assigned_days.append(date)
-                    if len(assigned_days) >= 2:
-                        break
+                    placed_once.add(team_name)
+                    team_to_days.setdefault(team_name, []).append(date)
+                    break  # placed once
 
-            # Fallback to other days if fewer than 2 assigned
-            if len(assigned_days) < 2:
-                for fallback_day, date in day_mapping.items():
-                    if date in assigned_days:
-                        continue
-                    possible_rooms = sorted(
-                        [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
-                        key=lambda x: x['capacity']
+        # Second round: assign extra preferred day if available
+        for team_name, team_size, preferred_str in team_preferences:
+            preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+            for day in preferred_days:
+                date = day_mapping[day]
+                if team_name in team_to_days and date in team_to_days[team_name]:
+                    continue  # already placed that day
+                available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
+                available = sorted(available, key=lambda r: r["capacity"])
+                if available:
+                    room = available[0]["name"]
+                    cur.execute(
+                        "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                        (team_name, room, date)
                     )
-                    if possible_rooms:
-                        room = possible_rooms[0]['name']
-                        cur.execute(
-                            "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                            (team_name, room, date)
-                        )
-                        used_rooms[date].append(room)
-                        assigned_days.append(date)
-                        if len(assigned_days) >= 2:
-                            break
+                    used_rooms[date].append(room)
+                    team_to_days.setdefault(team_name, []).append(date)
 
         # --- Oasis Allocation ---
         if oasis:
-            oasis_used = {d: [] for d in day_mapping.values()}
             cur.execute("SELECT person_name, preferred_days FROM oasis_preferences")
             person_rows = cur.fetchall()
+            random.shuffle(person_rows)
+            oasis_used = {d: [] for d in day_mapping.values()}
 
             for person_name, preferred_str in person_rows:
                 preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-                for day_name in preferred_days:
-                    date = day_mapping[day_name]
+                for day in preferred_days:
+                    date = day_mapping[day]
                     if len(oasis_used[date]) < oasis["capacity"]:
                         cur.execute(
                             "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
