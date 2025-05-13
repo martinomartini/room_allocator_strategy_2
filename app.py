@@ -11,7 +11,7 @@ import pandas as pd
 
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
-RESET_PASSWORD = "trainee"  # 🔐 Admin reset password
+RESET_PASSWORD = "trainee"  # Admin password
 
 try:
     OFFICE_TIMEZONE = pytz.timezone(OFFICE_TIMEZONE_STR)
@@ -58,7 +58,6 @@ def insert_preference(pool, team_name, contact_person, team_size, preferred_days
     conn = get_connection_from_pool(pool)
     try:
         with conn.cursor() as cur:
-            # Check how many unique days this team already submitted
             cur.execute("""
                 SELECT preferred_days FROM weekly_preferences
                 WHERE team_name = %s
@@ -73,18 +72,20 @@ def insert_preference(pool, team_name, contact_person, team_size, preferred_days
 
             if len(submitted_days) >= 2:
                 st.error("❌ This team has already submitted preferences for 2 days.")
-                return
+                return False
             if len(combined) > 2:
                 st.error("❌ Submitting these days would exceed the 2-day limit per team.")
-                return
+                return False
 
             cur.execute("""
                 INSERT INTO weekly_preferences (team_name, contact_person, team_size, preferred_days, submission_time)
                 VALUES (%s, %s, %s, %s, NOW())
             """, (team_name, contact_person, team_size, preferred_days))
             conn.commit()
+            return True
     except Exception as e:
         st.error(f"Failed to save preference: {e}")
+        return False
     finally:
         return_connection_to_pool(pool, conn)
 
@@ -110,10 +111,11 @@ def reset_allocations(pool):
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM weekly_allocations")
+            cur.execute("DELETE FROM weekly_preferences")
             conn.commit()
             return True
     except Exception as e:
-        st.error(f"Failed to reset allocations: {e}")
+        st.error(f"Failed to reset data: {e}")
         return False
     finally:
         return_connection_to_pool(pool, conn)
@@ -149,8 +151,9 @@ with st.form("weekly_preference_form"):
         else:
             preferred_days = ",".join(selected_days)
             if db_pool:
-                insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
-                st.success("✅ Preference submitted successfully!")
+                success = insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
+                if success:
+                    st.success("✅ Preference submitted successfully!")
 
 # --- Allocation Viewer ---
 st.header("Room Allocations for This Week")
@@ -166,9 +169,9 @@ if db_pool:
 with st.expander("🔐 Admin: Reset Allocations Now"):
     password = st.text_input("Enter admin password:", type="password")
     if password == RESET_PASSWORD:
-        if st.button("🚨 Reset Weekly Allocations"):
+        if st.button("🚨 Reset Weekly Allocations and Preferences"):
             if db_pool and reset_allocations(db_pool):
-                st.success("✅ Allocations table successfully cleared.")
+                st.success("✅ All weekly data cleared.")
                 st.rerun()
     elif password:
         st.error("❌ Incorrect password.")
