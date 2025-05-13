@@ -45,10 +45,16 @@ def get_room_grid(pool):
             df["Date"] = pd.to_datetime(df["Date"])
             df["Day"] = df["Date"].dt.strftime('%A')
 
-            # Group by Room and Day, concatenate team names
-            grouped = df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x)))).reset_index()
+            # Include all rooms and days in index
+            all_rooms = list(set(df["Room"].unique()) | {room["name"] for room in AVAILABLE_ROOMS})
+            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
+            full_index = pd.MultiIndex.from_product([all_rooms, all_days], names=["Room", "Day"])
 
-            # Pivot to get Room as rows, Days as columns
+            # Group and join multiple entries
+            grouped = df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x))))
+            grouped = grouped.reindex(full_index, fill_value="Vacant").reset_index()
+
+            # Pivot to tabular format
             pivot = grouped.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
             return pivot.reset_index()
     except Exception as e:
