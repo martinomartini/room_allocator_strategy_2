@@ -1,5 +1,3 @@
-# Full allocate_rooms.py with history-clearing logic
-
 import psycopg2
 import os
 import json
@@ -31,81 +29,52 @@ oasis = next((r for r in rooms if r['name'] == 'Oasis'), None)
 
 # --- Allocation Logic ---
 def run_allocation():
-    print("🔌 Connecting to database...")
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    print("🧹 Clearing old allocations and preferences...")
+    # Clear old allocations
     cur.execute("DELETE FROM weekly_allocations")
-    cur.execute("DELETE FROM weekly_preferences")
 
-    print("📥 Fetching team preferences (none expected after delete)...")
+    # Fetch preferences
     cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
     preferences = cur.fetchall()
-    print(f"🧠 Loaded {len(preferences)} team preferences.")
 
     used_rooms = {d: [] for d in day_mapping.values()}
 
     for team_name, team_size, preferred_str in preferences:
-        print(f"\n📌 Team: {team_name} (size {team_size})")
-        preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+        if preferred_str == "Monday,Wednesday":
+            preferred_days = ["Monday", "Wednesday"]
+        elif preferred_str == "Tuesday,Thursday":
+            preferred_days = ["Tuesday", "Thursday"]
+        else:
+            preferred_days = []
+
         assigned_days = []
         is_project = team_size >= 3
 
-        # First pass: preferred days
         for day_name in preferred_days:
             date = day_mapping[day_name]
             if is_project:
-                possible = sorted(
+                possible_rooms = sorted(
                     [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
                     key=lambda x: x['capacity']
                 )
-                if possible:
-                    room = possible[0]['name']
+                if possible_rooms:
+                    room = possible_rooms[0]['name']
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                                 (team_name, room, date))
                     used_rooms[date].append(room)
                     assigned_days.append(date)
-                    print(f"✅ Assigned to {room} on {day_name}")
             else:
                 if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                                 (team_name, 'Oasis', date))
                     used_rooms[date].append('Oasis')
                     assigned_days.append(date)
-                    print(f"✅ Assigned to Oasis on {day_name}")
 
-        # Fallback pass
-        if len(assigned_days) < 2:
-            print("🔄 Applying fallback...")
-        for day_name, date in day_mapping.items():
-            if len(assigned_days) >= 2 or date in assigned_days:
-                continue
-            if is_project:
-                possible = sorted(
-                    [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
-                    key=lambda x: x['capacity']
-                )
-                if possible:
-                    room = possible[0]['name']
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (team_name, room, date))
-                    used_rooms[date].append(room)
-                    assigned_days.append(date)
-                    print(f"➕ Fallback: {room} on {day_name}")
-            else:
-                if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (team_name, 'Oasis', date))
-                    used_rooms[date].append('Oasis')
-                    assigned_days.append(date)
-                    print(f"➕ Fallback: Oasis on {day_name}")
-
-    print("\n💾 Committing to database...")
     conn.commit()
     cur.close()
     conn.close()
-    print("✅ Allocation completed successfully.")
 
 if __name__ == "__main__":
     run_allocation()
