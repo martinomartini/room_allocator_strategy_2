@@ -28,7 +28,6 @@ except (FileNotFoundError, json.JSONDecodeError):
     st.error("Room configuration file is missing or invalid.")
     st.stop()
 
-# --- Database Helpers ---
 @st.cache_resource
 def get_db_connection_pool():
     if not DATABASE_URL:
@@ -185,7 +184,7 @@ def run_allocation(pool):
     cur.close()
     return_connection_to_pool(pool, conn)
 
-# --- Streamlit UI ---
+# --- UI ---
 st.set_page_config(page_title="Weekly Room Allocator", layout="centered")
 st.title("📅 Weekly Room Allocator")
 now_local = datetime.now(OFFICE_TIMEZONE)
@@ -218,7 +217,33 @@ with st.expander("🔐 Admin Controls"):
     elif password:
         st.error("❌ Incorrect password.")
 
-# --- Display Allocations ---
+# --- Preference Form ---
+st.header("Submit Your Preference for Next Week")
+with st.form("weekly_preference_form"):
+    team_name = st.text_input("Team Name:")
+    contact_person = st.text_input("Contact Person:")
+    team_size = st.number_input("Team Size:", min_value=1)
+    selected_days = st.multiselect(
+        "Select 2 preferred office days:",
+        ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        max_selections=2
+    )
+
+    submitted = st.form_submit_button("Submit Preference")
+    if submitted:
+        if not team_name or not contact_person:
+            st.warning("Please complete all fields.")
+        elif len(selected_days) != 2:
+            st.warning("Please select exactly two days.")
+        else:
+            preferred_days = ",".join(selected_days)
+            db_pool = get_db_connection_pool()
+            if db_pool:
+                success = insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
+                if success:
+                    st.success("✅ Preference submitted successfully!")
+
+# --- Allocation View ---
 st.header("Current Room Allocations")
 if db_pool:
     df = get_allocations(db_pool)
