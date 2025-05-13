@@ -134,9 +134,16 @@ with st.expander("🔐 Admin Controls"):
         prefs = run_query("SELECT team_name, contact_person, team_size, preferred_days FROM weekly_preferences ORDER BY submission_time DESC", fetch=True)
         if prefs:
             df = pd.DataFrame(prefs, columns=["Team", "Contact", "Size", "Preferred Days"])
+            st.write("### Team Preferences")
             st.dataframe(df, use_container_width=True)
+
+        oasis = run_query("SELECT person_name, preferred_days, submission_time FROM oasis_preferences ORDER BY submission_time DESC", fetch=True)
+        if oasis:
+            oasis_df = pd.DataFrame(oasis, columns=["Person", "Preferred Days", "Submitted At"])
+            st.write("### Oasis Preferences")
+            st.dataframe(oasis_df, use_container_width=True)
         else:
-            st.write("No submitted preferences.")
+            st.write("No Oasis preferences submitted.")
 
 # --- Preference Form ---
 st.header("Submit Your Preference for Next Week")
