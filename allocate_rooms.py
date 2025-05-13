@@ -72,6 +72,13 @@ def run_allocation():
                     used_rooms[date].append('Oasis')
                     assigned_days.append(date)
 
+    # Fill unallocated rooms as 'Unassigned' to display in overview
+    for day, date in day_mapping.items():
+        for room in project_rooms:
+            if room['name'] not in used_rooms[date]:
+                cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                            ('Unassigned', room['name'], date))
+
     conn.commit()
     cur.close()
     conn.close()
