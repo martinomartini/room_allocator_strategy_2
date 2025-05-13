@@ -11,7 +11,7 @@ import pandas as pd
 
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
-RESET_PASSWORD = "trainee"
+RESET_PASSWORD = "trainee"  # 🔐 Admin reset password
 
 try:
     OFFICE_TIMEZONE = pytz.timezone(OFFICE_TIMEZONE_STR)
@@ -58,7 +58,7 @@ def insert_preference(pool, team_name, contact_person, team_size, preferred_days
     conn = get_connection_from_pool(pool)
     try:
         with conn.cursor() as cur:
-            # Check how many unique days this team has already submitted
+            # Check how many unique days this team already submitted
             cur.execute("""
                 SELECT preferred_days FROM weekly_preferences
                 WHERE team_name = %s
@@ -169,7 +169,7 @@ with st.expander("🔐 Admin: Reset Allocations Now"):
         if st.button("🚨 Reset Weekly Allocations"):
             if db_pool and reset_allocations(db_pool):
                 st.success("✅ Allocations table successfully cleared.")
-                st.experimental_rerun()
+                st.rerun()
     elif password:
         st.error("❌ Incorrect password.")
 
