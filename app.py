@@ -72,6 +72,16 @@ def get_room_grid(pool):
     finally:
         return_connection_to_pool(pool, conn)
 
+def get_preferences(pool):
+    conn = get_connection_from_pool(pool)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT team_name, contact_person, team_size, preferred_days FROM weekly_preferences")
+            rows = cur.fetchall()
+            return pd.DataFrame(rows, columns=["Team", "Contact", "Size", "Days"])
+    finally:
+        return_connection_to_pool(pool, conn)
+
 def reset_preferences(pool):
     conn = get_connection_from_pool(pool)
     try:
@@ -116,6 +126,13 @@ with st.expander("🔐 Admin Controls"):
         if st.button("🧼 Reset Allocations"):
             if reset_allocations(db_pool):
                 st.success("✅ Allocations reset.")
+
+        prefs_df = get_preferences(db_pool)
+        if prefs_df.empty:
+            st.write("No submitted preferences.")
+        else:
+            st.write("### Submitted Preferences")
+            st.dataframe(prefs_df, use_container_width=True)
     elif password:
         st.error("❌ Incorrect password.")
 
