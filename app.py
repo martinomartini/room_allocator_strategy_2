@@ -65,7 +65,6 @@ def get_room_grid(pool):
     finally:
         return_connection(pool, conn)
 
-
 def get_oasis_grid(pool):
     conn = get_connection(pool)
     try:
@@ -192,12 +191,20 @@ with st.expander("🔐 Admin Controls"):
     if pwd == RESET_PASSWORD:
         st.success("✅ Access granted.")
 
+        # Run allocation
         if st.button("🚀 Run Allocation Now"):
-            if run_allocation(DATABASE_URL):
+            success, unplaced = run_allocation(DATABASE_URL)
+            if success:
                 st.success("✅ Allocation completed.")
+                if unplaced:
+                    st.warning("⚠️ The following teams could not be placed on any day:")
+                    st.write(", ".join(unplaced))
+                else:
+                    st.info("🎉 All teams were successfully placed at least once.")
             else:
                 st.error("❌ Allocation failed.")
 
+        # Reset buttons
         if st.button("🗑️ Reset Preferences"):
             if reset_preferences(pool):
                 st.success("✅ Preferences cleared.")
@@ -206,57 +213,24 @@ with st.expander("🔐 Admin Controls"):
             if reset_allocations(pool):
                 st.success("✅ Allocations cleared.")
 
-        # --- Editable Team Preferences ---
-        st.subheader("🧾 Team Preferences")
-        df1 = get_preferences(pool)
-        if not df1.empty:
-            editable_team_df = st.data_editor(df1, num_rows="dynamic", use_container_width=True, key="edit_teams")
-            if st.button("💾 Save Team Changes"):
-                try:
-                    conn = get_connection(pool)
-                    with conn.cursor() as cur:
-                        cur.execute("DELETE FROM weekly_preferences")
-                        for _, row in editable_team_df.iterrows():
-                            cur.execute("""
-                                INSERT INTO weekly_preferences (team_name, contact_person, team_size, preferred_days, submission_time)
-                                VALUES (%s, %s, %s, %s, NOW())
-                            """, (row["Team"], row["Contact"], int(row["Size"]), row["Days"]))
-                        conn.commit()
-                    st.success("✅ Team preferences updated.")
-                except Exception as e:
-                    st.error(f"❌ Failed to update team preferences: {e}")
-                finally:
-                    return_connection(pool, conn)
+        # Show Team Preferences
+        st.subheader("📋 Team Preferences")
+        df_team = get_preferences(pool)
+        if not df_team.empty:
+            st.dataframe(df_team, use_container_width=True)
         else:
-            st.info("No team preferences submitted yet.")
+            st.write("No team preferences submitted.")
 
-        # --- Editable Oasis Preferences ---
+        # Show Oasis Preferences
         st.subheader("🌿 Oasis Preferences")
-        df2 = get_oasis_preferences(pool)
-        if not df2.empty:
-            editable_oasis_df = st.data_editor(df2, num_rows="dynamic", use_container_width=True, key="edit_oasis")
-            if st.button("💾 Save Oasis Changes"):
-                try:
-                    conn = get_connection(pool)
-                    with conn.cursor() as cur:
-                        cur.execute("DELETE FROM oasis_preferences")
-                        for _, row in editable_oasis_df.iterrows():
-                            cur.execute("""
-                                INSERT INTO oasis_preferences (person_name, preferred_days, submission_time)
-                                VALUES (%s, %s, NOW())
-                            """, (row["Person"], row["Preferred Days"]))
-                        conn.commit()
-                    st.success("✅ Oasis preferences updated.")
-                except Exception as e:
-                    st.error(f"❌ Failed to update oasis preferences: {e}")
-                finally:
-                    return_connection(pool, conn)
+        df_oasis = get_oasis_preferences(pool)
+        if not df_oasis.empty:
+            st.dataframe(df_oasis, use_container_width=True)
         else:
-            st.info("No oasis preferences submitted yet.")
+            st.write("No oasis preferences submitted.")
 
     elif pwd:
         st.error("❌ Incorrect password.")
-
 
 # --- Team Form ---
 st.header("Submit Team Preference")
