@@ -1,9 +1,9 @@
 [
-  { "name": "Room A", "capacity": 5 },
-  { "name": "Room B", "capacity": 5 },
-  { "name": "Room C", "capacity": 4 },
-  { "name": "Room D", "capacity": 4 },
-  { "name": "Room E", "capacity": 4 },
-  { "name": "Room F", "capacity": 4 },
+  { "name": "Room D0206", "capacity": 5 },
+  { "name": "Room D0207", "capacity": 5 },
+  { "name": "Room D0289", "capacity": 4 },
+  { "name": "Room D0290", "capacity": 4 },
+  { "name": "Room D0291", "capacity": 4 },
+  { "name": "Room D0292", "capacity": 4 },
   { "name": "Oasis", "capacity": 12 }
 ]
