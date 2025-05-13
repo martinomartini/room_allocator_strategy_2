@@ -41,6 +41,7 @@ def run_allocation(database_url):
         used_rooms = {d: [] for d in day_mapping.values()}
         team_to_days = {}
         placed_once = set()
+        all_team_names = {team_name for team_name, _, _ in team_preferences}
 
         # First round: place each team once
         for team_name, team_size, preferred_str in team_preferences:
@@ -59,9 +60,9 @@ def run_allocation(database_url):
                     used_rooms[date].append(room)
                     placed_once.add(team_name)
                     team_to_days.setdefault(team_name, []).append(date)
-                    break  # placed once
+                    break
 
-        # Second round: assign extra preferred day if available
+        # Second round: try to add teams a second preferred day
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
             for day in preferred_days:
@@ -100,6 +101,16 @@ def run_allocation(database_url):
         conn.commit()
         cur.close()
         conn.close()
+
+        # --- Report Unplaced Teams ---
+        unplaced_teams = all_team_names - placed_once
+        if unplaced_teams:
+            print("🚫 The following teams could NOT be placed at all:")
+            for t in sorted(unplaced_teams):
+                print(f" - {t}")
+        else:
+            print("✅ All teams were placed at least once.")
+
         return True
 
     except Exception as e:
