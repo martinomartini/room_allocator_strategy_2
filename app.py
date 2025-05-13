@@ -74,6 +74,10 @@ def insert_preference(pool, team_name, contact_person, team_size, preferred_days
                 st.error("❌ Submitting these days would exceed the 2-day limit per team.")
                 return False
 
+            if not (new_days == {"Monday", "Wednesday"} or new_days == {"Tuesday", "Thursday"}):
+                st.error("❌ Please select either Monday & Wednesday OR Tuesday & Thursday.")
+                return False
+
             cur.execute("""
                 INSERT INTO weekly_preferences (team_name, contact_person, team_size, preferred_days, submission_time)
                 VALUES (%s, %s, %s, %s, NOW())
@@ -225,18 +229,22 @@ with st.form("weekly_preference_form"):
     team_size = st.number_input("Team Size:", min_value=1)
     selected_days = st.multiselect(
         "Select 2 preferred office days:",
-        ["Monday", "Tuesday", "Wednesday", "Thursday"],
-        max_selections=2
+        ["Monday and Wednesday", "Tuesday and Thursday"],
+        max_selections=1
     )
 
     submitted = st.form_submit_button("Submit Preference")
     if submitted:
         if not team_name or not contact_person:
             st.warning("Please complete all fields.")
-        elif len(selected_days) != 2:
-            st.warning("Please select exactly two days.")
+        elif len(selected_days) != 1:
+            st.warning("Please select exactly one option.")
         else:
-            preferred_days = ",".join(selected_days)
+            day_map = {
+                "Monday and Wednesday": "Monday,Wednesday",
+                "Tuesday and Thursday": "Tuesday,Thursday"
+            }
+            preferred_days = day_map[selected_days[0]]
             db_pool = get_db_connection_pool()
             if db_pool:
                 success = insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
