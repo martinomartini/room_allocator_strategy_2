@@ -100,13 +100,13 @@ def insert_oasis_preference(name, preferred_days):
 
 # --- Streamlit UI ---
 st.set_page_config("Weekly Room Allocator")
-st.title("\ud83d\uddd3 Weekly Room Allocator")
+st.title("📅 Weekly Room Allocator")
 
 now = datetime.now(OFFICE_TIMEZONE)
 st.info(f"Current Office Time: **{now.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
 # --- Admin Panel ---
-with st.expander("\ud83d\udd10 Admin Controls"):
+with st.expander("🔐 Admin Controls"):
     pw = st.text_input("Enter admin password:", type="password")
     if pw == ADMIN_PASSWORD:
         col1, col2, col3 = st.columns(3)
@@ -119,6 +119,7 @@ with st.expander("\ud83d\udd10 Admin Controls"):
         with col2:
             if st.button(":wastebasket: Reset Preferences"):
                 run_query("DELETE FROM weekly_preferences")
+                run_query("DELETE FROM oasis_preferences")
                 st.success("All preferences cleared.")
 
         with col3:
@@ -192,7 +193,7 @@ if allocs:
     df["Day"] = df["Date"].dt.strftime('%A')
 
     all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
-    all_rooms = sorted(df["Room"].unique())
+    all_rooms = sorted(set([room['name'] for room in AVAILABLE_ROOMS if room['name'] != 'Oasis']))
     pivot = df.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
     pivot = pivot.reindex(columns=all_days, fill_value="Vacant").reindex(index=all_rooms)
 
