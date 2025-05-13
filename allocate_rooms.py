@@ -35,49 +35,42 @@ def run_allocation():
     # Clear old allocations
     cur.execute("DELETE FROM weekly_allocations")
 
-    # Fetch preferences
+    # Fetch team preferences
     cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
     preferences = cur.fetchall()
 
     used_rooms = {d: [] for d in day_mapping.values()}
-
     for team_name, team_size, preferred_str in preferences:
-        if preferred_str == "Monday,Wednesday":
-            preferred_days = ["Monday", "Wednesday"]
-        elif preferred_str == "Tuesday,Thursday":
-            preferred_days = ["Tuesday", "Thursday"]
-        else:
-            preferred_days = []
-
+        preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
         assigned_days = []
-        is_project = team_size >= 3
 
         for day_name in preferred_days:
             date = day_mapping[day_name]
-            if is_project:
-                possible_rooms = sorted(
-                    [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
-                    key=lambda x: x['capacity']
-                )
-                if possible_rooms:
-                    room = possible_rooms[0]['name']
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (team_name, room, date))
-                    used_rooms[date].append(room)
-                    assigned_days.append(date)
-            else:
-                if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (team_name, 'Oasis', date))
-                    used_rooms[date].append('Oasis')
-                    assigned_days.append(date)
-
-    # Fill unallocated rooms as 'Unassigned' to display in overview
-    for day, date in day_mapping.items():
-        for room in project_rooms:
-            if room['name'] not in used_rooms[date]:
+            possible_rooms = sorted(
+                [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
+                key=lambda x: x['capacity']
+            )
+            if possible_rooms:
+                room = possible_rooms[0]['name']
                 cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                            ('Unassigned', room['name'], date))
+                            (team_name, room, date))
+                used_rooms[date].append(room)
+                assigned_days.append(date)
+
+    # --- Oasis Allocation ---
+    if oasis:
+        cur.execute("SELECT person_name, preferred_days FROM oasis_preferences")
+        individuals = cur.fetchall()
+
+        used_oasis = {d: [] for d in day_mapping.values()}
+        for person_name, preferred_str in individuals:
+            preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+            for day_name in preferred_days:
+                date = day_mapping[day_name]
+                if used_oasis[date].count('Oasis') < oasis['capacity']:
+                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                                (person_name, 'Oasis', date))
+                    used_oasis[date].append('Oasis')
 
     conn.commit()
     cur.close()
