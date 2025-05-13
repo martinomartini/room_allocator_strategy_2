@@ -47,6 +47,10 @@ def run_query(query, params=None, fetch=False):
         pool.putconn(conn)
 
 def insert_preference(team_name, contact_person, team_size, preferred_days):
+    if team_size > 5:
+        st.error("❌ Maximum team size is 5 people.")
+        return False
+
     conn = pool.getconn()
     try:
         with conn.cursor() as cur:
