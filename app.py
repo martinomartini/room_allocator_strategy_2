@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import psycopg2
 import psycopg2.pool
@@ -12,11 +11,12 @@ import pandas as pd
 
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
+RESET_PASSWORD = "trainee"  # <-- Password required to show reset button
 
 try:
     OFFICE_TIMEZONE = pytz.timezone(OFFICE_TIMEZONE_STR)
-except pytz.exceptions.UnknownTimeZoneError:
-    st.error(f"Invalid Timezone configured: '{OFFICE_TIMEZONE_STR}'. Defaulting to UTC.")
+except pytz.UnknownTimeZoneError:
+    st.error(f"Invalid Timezone: '{OFFICE_TIMEZONE_STR}', defaulting to UTC.")
     OFFICE_TIMEZONE = pytz.utc
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -85,45 +85,55 @@ def get_allocations(pool):
     finally:
         return_connection_to_pool(pool, conn)
 
+def reset_allocations(pool):
+    conn = get_connection_from_pool(pool)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM weekly_allocations")
+            conn.commit()
+            return True
+    except Exception as e:
+        st.error(f"Failed to reset allocations: {e}")
+        return False
+    finally:
+        return_connection_to_pool(pool, conn)
+
 # --- Streamlit App UI ---
 
 st.set_page_config(page_title="Weekly Room Allocator", layout="centered")
 st.title("📅 Weekly Office Room Allocator")
 
 now_local = datetime.now(OFFICE_TIMEZONE)
-day_name = now_local.strftime('%A')
-
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 
-# --- Preference Form (Fridays only) ---
-if day_name == 'Friday':
-    st.header("Submit Your Preference for Next Week")
-    with st.form("weekly_preference_form"):
-        team_name = st.text_input("Team Name:")
-        contact_person = st.text_input("Contact Person:")
-        team_size = st.number_input("Team Size:", min_value=1)
-        selected_days = st.multiselect(
-            "Select 2 preferred office days:",
-            ["Monday", "Tuesday", "Wednesday", "Thursday"],
-            max_selections=2
-        )
-
-        submitted = st.form_submit_button("Submit Preference")
-        if submitted:
-            if not team_name or not contact_person:
-                st.warning("Please complete all fields.")
-            elif len(selected_days) != 2:
-                st.warning("Please select exactly two days.")
-            else:
-                preferred_days = ",".join(selected_days)
-                db_pool = get_db_connection_pool()
-                if db_pool:
-                    insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
-                    st.success("✅ Preference submitted successfully!")
-
-# --- Allocation Viewer (always show if data exists) ---
-st.header("Room Allocations for This Week")
 db_pool = get_db_connection_pool()
+
+# --- Preference Form ---
+st.header("Submit Your Preference for Next Week")
+with st.form("weekly_preference_form"):
+    team_name = st.text_input("Team Name:")
+    contact_person = st.text_input("Contact Person:")
+    team_size = st.number_input("Team Size:", min_value=1)
+    selected_days = st.multiselect(
+        "Select 2 preferred office days:",
+        ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        max_selections=2
+    )
+
+    submitted = st.form_submit_button("Submit Preference")
+    if submitted:
+        if not team_name or not contact_person:
+            st.warning("Please complete all fields.")
+        elif len(selected_days) != 2:
+            st.warning("Please select exactly two days.")
+        else:
+            preferred_days = ",".join(selected_days)
+            if db_pool:
+                insert_preference(db_pool, team_name, contact_person, team_size, preferred_days)
+                st.success("✅ Preference submitted successfully!")
+
+# --- Allocation Viewer ---
+st.header("Room Allocations for This Week")
 if db_pool:
     df = get_allocations(db_pool)
     if df.empty:
@@ -131,6 +141,16 @@ if db_pool:
     else:
         df["Date"] = pd.to_datetime(df["Date"]).dt.strftime('%A %Y-%m-%d')
         st.dataframe(df, use_container_width=True)
+
+# --- Admin Reset ---
+with st.expander("🔐 Admin: Reset Allocations Now"):
+    password = st.text_input("Enter admin password:", type="password")
+    if password == RESET_PASSWORD:
+        if st.button("🚨 Reset Weekly Allocations"):
+            if db_pool and reset_allocations(db_pool):
+                st.success("✅ Allocations table successfully cleared.")
+    elif password:
+        st.error("❌ Incorrect password.")
 
 st.divider()
 st.caption("🔄 Preferences open every Friday. Allocations are made automatically each Saturday.")
