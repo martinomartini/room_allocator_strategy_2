@@ -40,8 +40,8 @@ def run_allocation():
     preferences = cur.fetchall()
 
     used_rooms = {d: [] for d in day_mapping.values()}
+    used_oasis_counts = {d: 0 for d in day_mapping.values()}
 
-    # Allocate project rooms
     for team_name, team_size, preferred_str in preferences:
         preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
         assigned_days = []
@@ -61,10 +61,10 @@ def run_allocation():
                     used_rooms[date].append(room)
                     assigned_days.append(date)
             else:
-                if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
+                if oasis and used_oasis_counts[date] < oasis['capacity']:
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (team_name, 'Oasis', date))
-                    used_rooms[date].append('Oasis')
+                                (f"Individual: {team_name}", 'Oasis', date))
+                    used_oasis_counts[date] += 1
                     assigned_days.append(date)
 
     # Allocate Oasis preferences (individuals)
@@ -73,13 +73,15 @@ def run_allocation():
 
     for person_name, preferred_str in oasis_preferences:
         preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+        assigned_days = []
 
         for day_name in preferred_days:
             date = day_mapping[day_name]
-            if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
+            if oasis and used_oasis_counts[date] < oasis['capacity']:
                 cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                             (f"Individual: {person_name}", 'Oasis', date))
-                used_rooms[date].append('Oasis')
+                used_oasis_counts[date] += 1
+                assigned_days.append(date)
 
     conn.commit()
     cur.close()
