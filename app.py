@@ -186,16 +186,9 @@ with st.expander("🔐 Admin Controls"):
     if pwd == RESET_PASSWORD:
         st.success("✅ Access granted.")
 
-        # Run allocation and capture unplaced teams
         if st.button("🚀 Run Allocation Now"):
-            success, unplaced = run_allocation(DATABASE_URL)
-            if success:
+            if run_allocation(DATABASE_URL):
                 st.success("✅ Allocation completed.")
-                if unplaced:
-                    st.warning("⚠️ The following teams could not be placed on any day:")
-                    st.write(", ".join(unplaced))
-                else:
-                    st.info("🎉 All teams were successfully placed at least once.")
             else:
                 st.error("❌ Allocation failed.")
 
@@ -206,9 +199,6 @@ with st.expander("🔐 Admin Controls"):
         if st.button("🧼 Reset Allocations"):
             if reset_allocations(pool):
                 st.success("✅ Allocations cleared.")
-    elif pwd:
-        st.error("❌ Incorrect password.")
-
 
         # --- Editable Team Preferences ---
         st.subheader("🧾 Team Preferences")
