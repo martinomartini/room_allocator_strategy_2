@@ -247,4 +247,4 @@ if oasis_df.empty:
 else:
     st.dataframe(oasis_df, use_container_width=True)
 
-st.caption("Room grid is based on weekly_allocations table.")
+st.caption("Room grid is based on weekly_allocations table. Made by Martino Martini")
