@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import psycopg2
 import psycopg2.pool
@@ -23,12 +25,8 @@ except pytz.UnknownTimeZoneError:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOMS_FILE = os.path.join(BASE_DIR, 'rooms.json')
 
-try:
-    with open(ROOMS_FILE, 'r') as f:
-        AVAILABLE_ROOMS = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    st.error("Room configuration file is missing or invalid.")
-    st.stop()
+with open(ROOMS_FILE, 'r') as f:
+    AVAILABLE_ROOMS = json.load(f)
 
 @st.cache_resource
 def get_db_connection_pool():
@@ -53,6 +51,7 @@ def return_connection_to_pool(pool, conn):
     except:
         pass
 
+# --- DB Actions ---
 def get_room_grid(pool):
     conn = get_connection_from_pool(pool)
     try:
@@ -80,7 +79,7 @@ def get_preferences(pool):
             rows = cur.fetchall()
             return pd.DataFrame(rows, columns=["Team", "Contact", "Size", "Days"])
     finally:
-        return_connection_from_pool(pool, conn)
+        return_connection_to_pool(pool, conn)
 
 def get_oasis_preferences(pool):
     conn = get_connection_from_pool(pool)
@@ -90,7 +89,7 @@ def get_oasis_preferences(pool):
             rows = cur.fetchall()
             return pd.DataFrame(rows, columns=["Person", "Preferred Days", "Submitted At"])
     finally:
-        return_connection_from_pool(pool, conn)
+        return_connection_to_pool(pool, conn)
 
 def insert_preference(pool, team_name, contact_person, team_size, preferred_days):
     if team_size > 5:
@@ -170,7 +169,7 @@ def reset_allocations(pool):
             conn.commit()
             return True
     finally:
-        return_connection_from_pool(pool, conn)
+        return_connection_to_pool(pool, conn)
 
 # --- UI ---
 st.title("📅 Weekly Room Allocator")
@@ -209,7 +208,7 @@ with st.expander("🔐 Admin Controls"):
     elif password:
         st.error("❌ Incorrect password.")
 
-# --- Preference Form ---
+# --- Team Preference Form ---
 st.header("Submit Your Preference for Next Week")
 with st.form("weekly_preference_form"):
     team_name = st.text_input("Team Name:")
