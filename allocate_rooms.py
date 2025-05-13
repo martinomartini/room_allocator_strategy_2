@@ -3,14 +3,13 @@ import os
 import json
 from datetime import datetime, timedelta
 import pytz
-import streamlit as st
+import pandas as pd
 
 # --- Configuration ---
-DATABASE_URL = os.environ.get("SUPABASE_DB_URI") or st.secrets.get("SUPABASE_DB_URI")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 OFFICE_TIMEZONE_STR = os.environ.get("OFFICE_TIMEZONE", "Europe/Amsterdam")
 ROOMS_FILE = os.path.join(os.path.dirname(__file__), "rooms.json")
 
-# --- Time Setup ---
 OFFICE_TIMEZONE = pytz.timezone(OFFICE_TIMEZONE_STR)
 now = datetime.now(OFFICE_TIMEZONE)
 this_monday = now - timedelta(days=now.weekday())
@@ -21,7 +20,6 @@ day_mapping = {
     "Thursday": (this_monday + timedelta(days=3)).date(),
 }
 
-# --- Load Room Setup ---
 with open(ROOMS_FILE, 'r') as f:
     rooms = json.load(f)
 
@@ -30,27 +28,23 @@ oasis = next((r for r in rooms if r['name'] == 'Oasis'), None)
 
 # --- Allocation Logic ---
 def run_allocation():
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
-        # Clear old allocations
-        cur.execute("DELETE FROM weekly_allocations")
+    cur.execute("DELETE FROM weekly_allocations")
+    cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
+    preferences = cur.fetchall()
 
-        used_rooms = {d: [] for d in day_mapping.values()}
-        used_oasis_counts = {d: 0 for d in day_mapping.values()}
+    used_rooms = {d: [] for d in day_mapping.values()}
 
-        # --- Team Allocations ---
-        cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
-        preferences = cur.fetchall()
+    for team_name, team_size, preferred_str in preferences:
+        preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+        assigned_days = []
+        is_project = team_size >= 3
 
-        for team_name, team_size, preferred_str in preferences:
-            if team_size < 3:
-                continue  # skip small teams (handled as individuals in oasis table)
-
-            preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-            for day_name in preferred_days:
-                date = day_mapping[day_name]
+        for day_name in preferred_days:
+            date = day_mapping[day_name]
+            if is_project:
                 possible_rooms = sorted(
                     [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
                     key=lambda x: x['capacity']
@@ -60,25 +54,29 @@ def run_allocation():
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                                 (team_name, room, date))
                     used_rooms[date].append(room)
+                    assigned_days.append(date)
 
-        # --- Oasis (Individual) Allocations ---
-        cur.execute("SELECT person_name, preferred_days FROM oasis_preferences")
-        oasis_preferences = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
 
-        for person_name, preferred_str in oasis_preferences:
-            preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-            for day_name in preferred_days:
-                date = day_mapping[day_name]
-                if oasis and used_oasis_counts[date] < oasis['capacity']:
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (f"Individual: {person_name}", 'Oasis', date))
-                    used_oasis_counts[date] += 1
+# --- Display Grid ---
+def generate_room_allocation_grid():
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
-        conn.commit()
-        cur.close()
-        conn.close()
-        return True
+    cur.execute("SELECT team_name, room_name, date FROM weekly_allocations")
+    results = cur.fetchall()
+    df = pd.DataFrame(results, columns=["Team", "Room", "Date"])
 
-    except Exception as e:
-        st.error(f"❌ Allocation failed: {e}")
-        return False
+    if df.empty:
+        return pd.DataFrame()
+
+    df["Day"] = pd.to_datetime(df["Date"]).dt.strftime("%A")
+    pivot = df.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
+
+    return pivot.reset_index()
+
+if __name__ == "__main__":
+    run_allocation()
+    print(generate_room_allocation_grid())
