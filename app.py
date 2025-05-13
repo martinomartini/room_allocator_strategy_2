@@ -9,7 +9,7 @@ import pandas as pd
 from allocate_rooms import run_allocation
 
 # --- Configuration ---
-st.set_page_config(page_title="Weekly Room Allocator", layout="centered")
+st.set_page_config(page_title="Weekly Room Allocator", layout="wide")
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
 RESET_PASSWORD = "trainee"
@@ -45,16 +45,13 @@ def get_room_grid(pool):
             df["Date"] = pd.to_datetime(df["Date"])
             df["Day"] = df["Date"].dt.strftime('%A')
 
-            # Include all rooms and days in index
-            all_rooms = list(set(df["Room"].unique()) | {room["name"] for room in AVAILABLE_ROOMS})
+            project_df = df[df["Room"] != "Oasis"]
+            all_rooms = list({room["name"] for room in AVAILABLE_ROOMS if room["name"] != "Oasis"})
             all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
             full_index = pd.MultiIndex.from_product([all_rooms, all_days], names=["Room", "Day"])
 
-            # Group and join multiple entries
-            grouped = df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x))))
+            grouped = project_df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x))))
             grouped = grouped.reindex(full_index, fill_value="Vacant").reset_index()
-
-            # Pivot to tabular format
             pivot = grouped.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
             return pivot.reset_index()
     except Exception as e:
@@ -63,6 +60,27 @@ def get_room_grid(pool):
     finally:
         return_connection(pool, conn)
 
+def get_oasis_grid(pool):
+    conn = get_connection(pool)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT team_name, room_name, date FROM weekly_allocations WHERE room_name = 'Oasis'")
+            data = cur.fetchall()
+            if not data:
+                return pd.DataFrame()
+            df = pd.DataFrame(data, columns=["Person", "Room", "Date"])
+            df["Date"] = pd.to_datetime(df["Date"])
+            df["Day"] = df["Date"].dt.strftime('%A')
+
+            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
+            grouped = df.groupby("Day")["Person"].apply(lambda x: ", ".join(sorted(set(x))))
+            grouped = grouped.reindex(all_days, fill_value="Vacant").reset_index()
+            return grouped.rename(columns={"Day": "Weekday", "Person": "People"})
+    except Exception as e:
+        st.warning(f"Failed to load oasis allocation data: {e}")
+        return pd.DataFrame()
+    finally:
+        return_connection(pool, conn)
 
 def get_preferences(pool):
     conn = get_connection(pool)
@@ -215,11 +233,18 @@ with st.form("oasis_form"):
             st.success("✅ Oasis vote submitted!")
 
 # --- Allocations Table ---
-st.header("Current Allocations")
+st.header("📌 Project Room Allocations")
 alloc_df = get_room_grid(pool)
 if alloc_df.empty:
     st.write("No allocations yet.")
 else:
     st.dataframe(alloc_df, use_container_width=True)
+
+st.header("🌿 Oasis Seat Allocations")
+oasis_df = get_oasis_grid(pool)
+if oasis_df.empty:
+    st.write("No oasis allocations yet.")
+else:
+    st.dataframe(oasis_df, use_container_width=True)
 
 st.caption("Room grid is based on weekly_allocations table.")
