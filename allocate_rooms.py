@@ -1,13 +1,11 @@
-# allocate_rooms.py
-import psycopg2
 import os
 import json
 from datetime import datetime, timedelta
 import pytz
-import random
+import psycopg2
 
 # --- Configuration ---
-DATABASE_URL = os.environ.get("DATABASE_URL")  # Updated for GitHub Actions
+DATABASE_URL = os.environ.get("DATABASE_URL")
 OFFICE_TIMEZONE_STR = os.environ.get("OFFICE_TIMEZONE", "Europe/Amsterdam")
 ROOMS_FILE = os.path.join(os.path.dirname(__file__), "rooms.json")
 
@@ -31,19 +29,22 @@ oasis = next((r for r in rooms if r['name'] == 'Oasis'), None)
 
 # --- Allocation Logic ---
 def run_allocation():
+    print("Connecting to database...")
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    # Clear old allocations
+    print("Clearing previous weekly allocations...")
     cur.execute("DELETE FROM weekly_allocations")
 
-    # Fetch preferences
+    print("Fetching team preferences...")
     cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
     preferences = cur.fetchall()
 
     used_rooms = {d: [] for d in day_mapping.values()}
+    print(f"Loaded {len(preferences)} preferences. Starting allocation...")
 
     for team_name, team_size, preferred_str in preferences:
+        print(f"Allocating for team '{team_name}' (size {team_size})...")
         preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
         assigned_days = []
         is_project = team_size >= 3
@@ -61,14 +62,15 @@ def run_allocation():
                                 (team_name, room, date))
                     used_rooms[date].append(room)
                     assigned_days.append(date)
+                    print(f"✅ {team_name} → {room} on {date}")
             else:
                 if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                                 (team_name, 'Oasis', date))
                     used_rooms[date].append('Oasis')
                     assigned_days.append(date)
+                    print(f"✅ {team_name} → Oasis on {date}")
 
-        # Fallback to fill 2 days
         while len(assigned_days) < 2:
             for day_name, date in day_mapping.items():
                 if date in assigned_days:
@@ -84,6 +86,7 @@ def run_allocation():
                                     (team_name, room, date))
                         used_rooms[date].append(room)
                         assigned_days.append(date)
+                        print(f"🔄 Fallback: {team_name} → {room} on {date}")
                         break
                 else:
                     if oasis and used_rooms[date].count('Oasis') < oasis['capacity']:
@@ -91,11 +94,14 @@ def run_allocation():
                                     (team_name, 'Oasis', date))
                         used_rooms[date].append('Oasis')
                         assigned_days.append(date)
+                        print(f"🔄 Fallback: {team_name} → Oasis on {date}")
                         break
 
+    print("Committing allocation results...")
     conn.commit()
     cur.close()
     conn.close()
+    print("🏁 Allocation process completed.")
 
 if __name__ == "__main__":
     run_allocation()
