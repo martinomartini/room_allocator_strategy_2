@@ -44,13 +44,19 @@ def get_room_grid(pool):
             df = pd.DataFrame(data, columns=["Team", "Room", "Date"])
             df["Date"] = pd.to_datetime(df["Date"])
             df["Day"] = df["Date"].dt.strftime('%A')
-            pivot = df.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
+
+            # Group by Room and Day, concatenate team names
+            grouped = df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x)))).reset_index()
+
+            # Pivot to get Room as rows, Days as columns
+            pivot = grouped.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
             return pivot.reset_index()
     except Exception as e:
         st.warning(f"Failed to load allocation data: {e}")
         return pd.DataFrame()
     finally:
         return_connection(pool, conn)
+
 
 def get_preferences(pool):
     conn = get_connection(pool)
