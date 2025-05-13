@@ -41,12 +41,30 @@ def run_allocation(database_url):
 
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-            assigned_days = []
+            assigned = False
             is_project = team_size >= 3
 
+            # Try preferred days first
             for day_name in preferred_days:
                 date = day_mapping[day_name]
-                if is_project:
+                possible_rooms = sorted(
+                    [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
+                    key=lambda x: x['capacity']
+                )
+                if possible_rooms:
+                    room = possible_rooms[0]['name']
+                    cur.execute(
+                        "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                        (team_name, room, date)
+                    )
+                    used_rooms[date].append(room)
+                    assigned = True
+                    break  # Assign to first available preferred day
+
+            # If no room on preferred days, try fallback days
+            if not assigned:
+                for fallback_day in day_mapping:
+                    date = day_mapping[fallback_day]
                     possible_rooms = sorted(
                         [r for r in project_rooms if r['capacity'] >= team_size and r['name'] not in used_rooms[date]],
                         key=lambda x: x['capacity']
@@ -58,7 +76,8 @@ def run_allocation(database_url):
                             (team_name, room, date)
                         )
                         used_rooms[date].append(room)
-                        assigned_days.append(date)
+                        break  # Assign at least once
+
 
         # --- Oasis Allocation ---
         if oasis:
