@@ -36,23 +36,23 @@ def run_allocation(database_url):
         # --- Load Team Preferences ---
         cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
         team_preferences = cur.fetchall()
-        random.shuffle(team_preferences)
+        random.shuffle(team_preferences)  # Randomize team order
 
         used_rooms = {d: [] for d in day_mapping.values()}
         team_to_days = {}
         placed_once = set()
         all_team_names = {team_name for team_name, _, _ in team_preferences}
 
-        # First round: place each team once
+        # --- First round: place each team once ---
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
-            random.shuffle(preferred_days)
+            random.shuffle(preferred_days)  # Randomize which preferred day to try first
+
             for day in preferred_days:
                 date = day_mapping[day]
                 available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
-                available = sorted(available, key=lambda r: r["capacity"])
                 if available:
-                    room = available[0]["name"]
+                    room = random.choice(available)["name"]  # Random room pick
                     cur.execute(
                         "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                         (team_name, room, date)
@@ -62,17 +62,18 @@ def run_allocation(database_url):
                     team_to_days.setdefault(team_name, []).append(date)
                     break
 
-        # Second round: try to add teams a second preferred day
+        # --- Second round: try to place on other preferred day ---
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+            random.shuffle(preferred_days)
+
             for day in preferred_days:
                 date = day_mapping[day]
                 if team_name in team_to_days and date in team_to_days[team_name]:
-                    continue  # already placed that day
+                    continue  # already placed on this day
                 available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
-                available = sorted(available, key=lambda r: r["capacity"])
                 if available:
-                    room = available[0]["name"]
+                    room = random.choice(available)["name"]
                     cur.execute(
                         "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                         (team_name, room, date)
@@ -89,6 +90,8 @@ def run_allocation(database_url):
 
             for person_name, preferred_str in person_rows:
                 preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+                random.shuffle(preferred_days)
+
                 for day in preferred_days:
                     date = day_mapping[day]
                     if len(oasis_used[date]) < oasis["capacity"]:
@@ -103,16 +106,9 @@ def run_allocation(database_url):
         conn.close()
 
         # --- Report Unplaced Teams ---
-        unplaced_teams = all_team_names - placed_once
-        if unplaced_teams:
-            print("🚫 The following teams could NOT be placed at all:")
-            for t in sorted(unplaced_teams):
-                print(f" - {t}")
-        else:
-            print("✅ All teams were placed at least once.")
-
-        return True
+        unplaced_teams = sorted(all_team_names - placed_once)
+        return True, unplaced_teams
 
     except Exception as e:
         print(f"Allocation failed: {e}")
-        return False
+        return False, []
