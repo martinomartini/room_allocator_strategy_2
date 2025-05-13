@@ -1,9 +1,9 @@
 import psycopg2
 import json
 import os
+import random
 from datetime import datetime, timedelta
 import pytz
-import random
 
 # --- Time Setup ---
 OFFICE_TIMEZONE = pytz.timezone("Europe/Amsterdam")
@@ -43,13 +43,16 @@ def run_allocation(database_url):
         placed_once = set()
         all_team_names = {team_name for team_name, _, _ in team_preferences}
 
-        # First round: place each team once
+        # --- First Round: Ensure one placement per team ---
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
             random.shuffle(preferred_days)
             for day in preferred_days:
                 date = day_mapping[day]
-                available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
+                available = [
+                    r for r in project_rooms
+                    if r["capacity"] >= team_size and r["name"] not in used_rooms[date]
+                ]
                 available = sorted(available, key=lambda r: r["capacity"])
                 if available:
                     room = available[0]["name"]
@@ -62,14 +65,18 @@ def run_allocation(database_url):
                     team_to_days.setdefault(team_name, []).append(date)
                     break
 
-        # Second round: try to add teams a second preferred day
+        # --- Second Round: Try placing again on other preferred day ---
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
+            random.shuffle(preferred_days)
             for day in preferred_days:
                 date = day_mapping[day]
                 if team_name in team_to_days and date in team_to_days[team_name]:
-                    continue  # already placed that day
-                available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
+                    continue  # already placed on this day
+                available = [
+                    r for r in project_rooms
+                    if r["capacity"] >= team_size and r["name"] not in used_rooms[date]
+                ]
                 available = sorted(available, key=lambda r: r["capacity"])
                 if available:
                     room = available[0]["name"]
@@ -79,13 +86,14 @@ def run_allocation(database_url):
                     )
                     used_rooms[date].append(room)
                     team_to_days.setdefault(team_name, []).append(date)
+                    break
 
         # --- Oasis Allocation ---
         if oasis:
+            oasis_used = {d: [] for d in day_mapping.values()}
             cur.execute("SELECT person_name, preferred_days FROM oasis_preferences")
             person_rows = cur.fetchall()
             random.shuffle(person_rows)
-            oasis_used = {d: [] for d in day_mapping.values()}
 
             for person_name, preferred_str in person_rows:
                 preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
@@ -102,17 +110,10 @@ def run_allocation(database_url):
         cur.close()
         conn.close()
 
-        # --- Report Unplaced Teams ---
-        unplaced_teams = all_team_names - placed_once
-        if unplaced_teams:
-            print("🚫 The following teams could NOT be placed at all:")
-            for t in sorted(unplaced_teams):
-                print(f" - {t}")
-        else:
-            print("✅ All teams were placed at least once.")
-
-        return True
+        # --- Return unplaced teams ---
+        unplaced = all_team_names - placed_once
+        return True, sorted(unplaced)
 
     except Exception as e:
         print(f"Allocation failed: {e}")
-        return False
+        return False, []
