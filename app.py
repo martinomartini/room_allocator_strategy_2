@@ -37,11 +37,15 @@ def get_room_grid(pool):
     conn = get_connection(pool)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT team_name, room_name, date FROM weekly_allocations")
+            cur.execute("""
+                SELECT wa.team_name, wp.contact_person, wa.room_name, wa.date
+                FROM weekly_allocations wa
+                LEFT JOIN weekly_preferences wp ON wa.team_name = wp.team_name
+            """)
             data = cur.fetchall()
             if not data:
                 return pd.DataFrame()
-            df = pd.DataFrame(data, columns=["Team", "Room", "Date"])
+            df = pd.DataFrame(data, columns=["Team", "Contact", "Room", "Date"])
             df["Date"] = pd.to_datetime(df["Date"])
             df["Day"] = df["Date"].dt.strftime('%A')
 
@@ -50,15 +54,17 @@ def get_room_grid(pool):
             all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
             full_index = pd.MultiIndex.from_product([all_rooms, all_days], names=["Room", "Day"])
 
-            grouped = project_df.groupby(["Room", "Day"])["Team"].apply(lambda x: ", ".join(sorted(set(x))))
+            project_df["Display"] = project_df["Team"] + " (" + project_df["Contact"] + ")"
+            grouped = project_df.groupby(["Room", "Day"])["Display"].apply(lambda x: ", ".join(sorted(set(x))))
             grouped = grouped.reindex(full_index, fill_value="Vacant").reset_index()
-            pivot = grouped.pivot(index="Room", columns="Day", values="Team").fillna("Vacant")
+            pivot = grouped.pivot(index="Room", columns="Day", values="Display").fillna("Vacant")
             return pivot.reset_index()
     except Exception as e:
         st.warning(f"Failed to load allocation data: {e}")
         return pd.DataFrame()
     finally:
         return_connection(pool, conn)
+
 
 def get_oasis_grid(pool):
     conn = get_connection(pool)
