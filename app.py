@@ -188,6 +188,26 @@ def reset_allocations(pool):
 
 # --- UI ---
 st.title("📅 Weekly Room Allocator")
+st.markdown("""
+### ℹ️ How This Works
+
+Welcome to the **Weekly Room Allocator**! Here's how the process works:
+
+#### 🧑‍🤝‍🧑 Project Teams
+- Each team selects a **preferred pair of office days**: either `Monday & Wednesday` or `Tuesday & Thursday`.
+- If rooms are available on both of those days, the team is assigned accordingly.
+- If not, the system will try to allocate your team on the **alternative pair**.
+- Allocation is done **randomly**, not first come first serve, to keep it fair.
+
+#### 🌿 Oasis Desk Users
+- Each person selects **any two preferred days** (e.g. `Monday` and `Thursday`).
+- The system tries to assign both days as requested.
+- If those are full, it assigns you **any two available days**.
+- There are **12 Oasis spots per day**.
+
+Allocation results are refreshed every week by an admin and shown below. You can update your preferences at any time before allocation is run.
+""")
+
 now_local = datetime.now(OFFICE_TIMEZONE)
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
 pool = get_db_connection_pool()
