@@ -281,18 +281,19 @@ with st.form("team_form"):
 st.header("Reserve Oasis Seat")
 with st.form("oasis_form"):
     person = st.text_input("Your Name")
-    col1, col2 = st.columns(2)
-    with col1:
-        day1 = st.selectbox("Preferred Day 1", ["Monday", "Tuesday", "Wednesday", "Thursday"])
-    with col2:
-        day2 = st.selectbox("Preferred Day 2", ["Monday", "Tuesday", "Wednesday", "Thursday"])
+    selected_days = st.multiselect(
+        "Select Your 2 Preferred Days for Oasis:",
+        ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        max_selections=2
+    )
     submit_oasis = st.form_submit_button("Submit Oasis Preference")
     if submit_oasis:
-        if day1 == day2:
-            st.error("❌ Please select two different days.")
+        if len(selected_days) != 2:
+            st.error("❌ Please select exactly 2 different days.")
         else:
-            if insert_oasis(pool, person, day1, day2):
+            if insert_oasis(pool, person, selected_days[0], selected_days[1]):
                 st.success("✅ Oasis preference submitted!")
+
 
 # --- Allocations ---
 st.header("📌 Project Room Allocations")
