@@ -58,13 +58,18 @@ def get_room_grid(pool):
             grouped = project_df.groupby(["Room", "Day"])["Display"].apply(lambda x: ", ".join(sorted(set(x))))
             grouped = grouped.reindex(full_index, fill_value="Vacant").reset_index()
             pivot = grouped.pivot(index="Room", columns="Day", values="Display").fillna("Vacant")
-            return pivot.reset_index()
+            pivot = pivot.reset_index()
+
+            # Reorder weekday columns to correct order
+            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday"]
+            pivot = pivot[["Room"] + [day for day in day_order if day in pivot.columns]]
+
+            return pivot
     except Exception as e:
         st.warning(f"Failed to load allocation data: {e}")
         return pd.DataFrame()
     finally:
         return_connection(pool, conn)
-
 
 def get_oasis_grid(pool):
     conn = get_connection(pool)
@@ -81,12 +86,15 @@ def get_oasis_grid(pool):
             all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
             grouped = df.groupby("Day")["Person"].apply(lambda x: ", ".join(sorted(set(x))))
             grouped = grouped.reindex(all_days, fill_value="Vacant").reset_index()
-            return grouped.rename(columns={"Day": "Weekday", "Person": "People"})
+            grouped = grouped.rename(columns={"Day": "Weekday", "Person": "People"})
+
+            return grouped
     except Exception as e:
         st.warning(f"Failed to load oasis allocation data: {e}")
         return pd.DataFrame()
     finally:
         return_connection(pool, conn)
+
 
 def get_preferences(pool):
     conn = get_connection(pool)
