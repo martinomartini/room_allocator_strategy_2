@@ -60,7 +60,6 @@ def get_room_grid(pool):
             pivot = grouped.pivot(index="Room", columns="Day", values="Display").fillna("Vacant")
             pivot = pivot.reset_index()
 
-            # Reorder weekday columns to correct order
             day_order = ["Monday", "Tuesday", "Wednesday", "Thursday"]
             pivot = pivot[["Room"] + [day for day in day_order if day in pivot.columns]]
 
@@ -95,7 +94,6 @@ def get_oasis_grid(pool):
     finally:
         return_connection(pool, conn)
 
-
 def get_preferences(pool):
     conn = get_connection(pool)
     try:
@@ -113,9 +111,9 @@ def get_oasis_preferences(pool):
     conn = get_connection(pool)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT person_name, preferred_days, submission_time FROM oasis_preferences")
+            cur.execute("SELECT person_name, preferred_day_1, preferred_day_2, submission_time FROM oasis_preferences")
             rows = cur.fetchall()
-            return pd.DataFrame(rows, columns=["Person", "Preferred Days", "Submitted At"])
+            return pd.DataFrame(rows, columns=["Person", "Day 1", "Day 2", "Submitted At"])
     except Exception as e:
         st.warning(f"Failed to fetch oasis preferences: {e}")
         return pd.DataFrame()
@@ -151,14 +149,14 @@ def insert_preference(pool, team, contact, size, days):
     finally:
         return_connection(pool, conn)
 
-def insert_oasis(pool, person, days):
+def insert_oasis(pool, person, day1, day2):
     conn = get_connection(pool)
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO oasis_preferences (person_name, preferred_days, submission_time)
-                VALUES (%s, %s, NOW())
-            """, (person, days))
+                INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, submission_time)
+                VALUES (%s, %s, %s, NOW())
+            """, (person, day1, day2))
             conn.commit()
             return True
     except Exception as e:
@@ -214,7 +212,6 @@ with st.expander("🔐 Admin Controls"):
             if reset_allocations(pool):
                 st.success("✅ Allocations cleared.")
 
-        # --- Editable Team Preferences ---
         st.subheader("🧾 Team Preferences")
         df1 = get_preferences(pool)
         if not df1.empty:
@@ -238,7 +235,6 @@ with st.expander("🔐 Admin Controls"):
         else:
             st.info("No team preferences submitted yet.")
 
-        # --- Editable Oasis Preferences ---
         st.subheader("🌿 Oasis Preferences")
         df2 = get_oasis_preferences(pool)
         if not df2.empty:
@@ -250,9 +246,9 @@ with st.expander("🔐 Admin Controls"):
                         cur.execute("DELETE FROM oasis_preferences")
                         for _, row in editable_oasis_df.iterrows():
                             cur.execute("""
-                                INSERT INTO oasis_preferences (person_name, preferred_days, submission_time)
-                                VALUES (%s, %s, NOW())
-                            """, (row["Person"], row["Preferred Days"]))
+                                INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, submission_time)
+                                VALUES (%s, %s, %s, NOW())
+                            """, (row["Person"], row["Day 1"], row["Day 2"]))
                         conn.commit()
                     st.success("✅ Oasis preferences updated.")
                 except Exception as e:
@@ -264,7 +260,6 @@ with st.expander("🔐 Admin Controls"):
 
     elif pwd:
         st.error("❌ Incorrect password.")
-
 
 # --- Team Form ---
 st.header("Submit Team Preference")
@@ -286,17 +281,20 @@ with st.form("team_form"):
 st.header("Reserve Oasis Seat")
 with st.form("oasis_form"):
     person = st.text_input("Your Name")
-    oasis_day = st.selectbox("Preferred Days", ["Monday and Wednesday", "Tuesday and Thursday"])
+    col1, col2 = st.columns(2)
+    with col1:
+        day1 = st.selectbox("Preferred Day 1", ["Monday", "Tuesday", "Wednesday", "Thursday"])
+    with col2:
+        day2 = st.selectbox("Preferred Day 2", ["Monday", "Tuesday", "Wednesday", "Thursday"])
     submit_oasis = st.form_submit_button("Submit Oasis Preference")
     if submit_oasis:
-        day_map = {
-            "Monday and Wednesday": "Monday,Wednesday",
-            "Tuesday and Thursday": "Tuesday,Thursday"
-        }
-        if insert_oasis(pool, person, day_map[oasis_day]):
-            st.success("✅ Oasis vote submitted!")
+        if day1 == day2:
+            st.error("❌ Please select two different days.")
+        else:
+            if insert_oasis(pool, person, day1, day2):
+                st.success("✅ Oasis preference submitted!")
 
-# --- Allocations Table ---
+# --- Allocations ---
 st.header("📌 Project Room Allocations")
 alloc_df = get_room_grid(pool)
 if alloc_df.empty:

@@ -97,54 +97,21 @@ def run_allocation(database_url):
                 used_rooms[d2].append(room2)
                 team_to_days[team_name] = [d1, d2]
 
-        # --- Oasis Allocation ---
-        cur.execute("SELECT person_name, preferred_days FROM oasis_preferences")
+        # --- Oasis Allocation (New Logic) ---
+        cur.execute("SELECT person_name, preferred_day_1, preferred_day_2 FROM oasis_preferences")
         person_rows = cur.fetchall()
+        random.shuffle(person_rows)  # Randomize order
 
         oasis_used = {d: set() for d in day_mapping.values()}
         person_to_days = {}
 
-        mon_wed = []
-        tue_thu = []
+        # Round 1: Assign both preferred days if capacity allows
+        for person_name, d1_label, d2_label in person_rows:
+            if d1_label not in day_mapping or d2_label not in day_mapping:
+                continue  # skip invalid input
 
-        for person_name, preferred_str in person_rows:
-            preferred_days = sorted([d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping])
-            if preferred_days == ["Monday", "Wednesday"]:
-                mon_wed.append((person_name, preferred_days))
-            elif preferred_days == ["Tuesday", "Thursday"]:
-                tue_thu.append((person_name, preferred_days))
-
-        def assign_oasis_group(group, d1_label, d2_label):
             d1 = day_mapping[d1_label]
             d2 = day_mapping[d2_label]
-            for person_name, _ in random.sample(group, len(group)):
-                if len(oasis_used[d1]) < oasis["capacity"] and len(oasis_used[d2]) < oasis["capacity"]:
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", d1))
-                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", d2))
-                    oasis_used[d1].add(person_name)
-                    oasis_used[d2].add(person_name)
-                    person_to_days[person_name] = [d1, d2]
-
-        assign_oasis_group(mon_wed, "Monday", "Wednesday")
-        assign_oasis_group(tue_thu, "Tuesday", "Thursday")
-
-        # --- Fallback for Oasis users ---
-        placed_people = set(person_to_days.keys())
-        all_people = {p for p, _ in person_rows}
-        unplaced_people = list(all_people - placed_people)
-
-        for person_name in random.sample(unplaced_people, len(unplaced_people)):
-            preferred_str = next(p for p, pd in person_rows if p == person_name)
-            preferred_days = sorted([d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping])
-            if preferred_days == ["Monday", "Wednesday"]:
-                fallback_days = ["Tuesday", "Thursday"]
-            elif preferred_days == ["Tuesday", "Thursday"]:
-                fallback_days = ["Monday", "Wednesday"]
-            else:
-                continue
-
-            d1 = day_mapping[fallback_days[0]]
-            d2 = day_mapping[fallback_days[1]]
 
             if len(oasis_used[d1]) < oasis["capacity"] and len(oasis_used[d2]) < oasis["capacity"]:
                 cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", d1))
@@ -153,12 +120,30 @@ def run_allocation(database_url):
                 oasis_used[d2].add(person_name)
                 person_to_days[person_name] = [d1, d2]
 
+        # Round 2: Fallback for unplaced people — any two available days
+        placed_people = set(person_to_days.keys())
+        all_people = {p for p, _, _ in person_rows}
+        unplaced_people = list(all_people - placed_people)
+
+        for person_name in random.sample(unplaced_people, len(unplaced_people)):
+            available_days = [d for d in day_mapping.values() if len(oasis_used[d]) < oasis["capacity"]]
+            random.shuffle(available_days)
+            if len(available_days) < 2:
+                continue  # Not enough space for two days
+
+            d1, d2 = available_days[:2]
+            cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", d1))
+            cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", d2))
+            oasis_used[d1].add(person_name)
+            oasis_used[d2].add(person_name)
+            person_to_days[person_name] = [d1, d2]
+
         conn.commit()
         cur.close()
         conn.close()
 
         unplaced_teams = sorted([t for t, _, _ in team_preferences if t not in team_to_days])
-        unplaced_people = sorted([p for p, _ in person_rows if p not in person_to_days])
+        unplaced_people = sorted([p for p, _, _ in person_rows if p not in person_to_days])
         return True, unplaced_teams + unplaced_people
 
     except Exception as e:
