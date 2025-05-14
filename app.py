@@ -153,6 +153,13 @@ def insert_oasis(pool, person, day1, day2):
     conn = get_connection(pool)
     try:
         with conn.cursor() as cur:
+            # Check if name already exists
+            cur.execute("SELECT 1 FROM oasis_preferences WHERE person_name = %s", (person,))
+            if cur.fetchone():
+                st.error("❌ You've already submitted your preference. Please contact admin to change it.")
+                return False
+
+            # Insert new record
             cur.execute("""
                 INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, submission_time)
                 VALUES (%s, %s, %s, NOW())
@@ -164,6 +171,7 @@ def insert_oasis(pool, person, day1, day2):
         return False
     finally:
         return_connection(pool, conn)
+
 
 def reset_preferences(pool):
     conn = get_connection(pool)
