@@ -153,13 +153,13 @@ def insert_oasis(pool, person, day1, day2):
     conn = get_connection(pool)
     try:
         with conn.cursor() as cur:
-            # Check if name already exists
+            # Prevent duplicate
             cur.execute("SELECT 1 FROM oasis_preferences WHERE person_name = %s", (person,))
             if cur.fetchone():
-                st.error("❌ You've already submitted your preference. Please contact admin to change it.")
+                st.error("❌ You've already submitted. Contact admin to change your selection.")
                 return False
 
-            # Insert new record
+            # Insert new vote
             cur.execute("""
                 INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, submission_time)
                 VALUES (%s, %s, %s, NOW())
@@ -171,6 +171,7 @@ def insert_oasis(pool, person, day1, day2):
         return False
     finally:
         return_connection(pool, conn)
+
 
 
 def reset_preferences(pool):
@@ -196,25 +197,15 @@ def reset_allocations(pool):
 
 # --- UI ---
 st.title("📅 Weekly Room Allocator")
-st.markdown("""
-### ℹ️ How This Works
+st.info("""
+💡 **How This Works:**
 
-Welcome to the **Weekly Room Allocator**! Here's how the process works:
-
-#### 🧑‍🤝‍🧑 Project Teams
-- Each team selects a **preferred pair of office days**: either `Monday & Wednesday` or `Tuesday & Thursday`.
-- If rooms are available on both of those days, the team is assigned accordingly.
-- If not, the system will try to allocate your team on the **alternative pair**.
-- Allocation is done **randomly**, not first come first serve, to keep it fair.
-
-#### 🌿 Oasis Desk Users
-- Each person selects **any two preferred days** (e.g. `Monday` and `Thursday`).
-- The system tries to assign both days as requested.
-- If those are full, it assigns you **any two available days**.
-- There are **12 Oasis spots per day**.
-
-Allocation results are refreshed every week by an admin and shown below. You can update your preferences at any time before allocation is run.
+- 🧑‍🤝‍🧑 Project teams can select **either Monday & Wednesday** or **Tuesday & Thursday**.
+- 🌿 Oasis users can choose **any 2 weekdays**, and will be randomly assigned.
+- ❗ You may only submit **once**. If you need to change your input, contact an admin.
+- ✅ Allocations are refreshed **weekly** by an admin. You can vote until allocation is run (typically Friday 17:00).
 """)
+
 
 now_local = datetime.now(OFFICE_TIMEZONE)
 st.info(f"Current Office Time: **{now_local.strftime('%Y-%m-%d %H:%M:%S')}** ({OFFICE_TIMEZONE_STR})")
@@ -315,12 +306,16 @@ with st.form("oasis_form"):
         max_selections=2
     )
     submit_oasis = st.form_submit_button("Submit Oasis Preference")
+
     if submit_oasis:
-        if len(selected_days) != 2:
-            st.error("❌ Please select exactly 2 different days.")
+        if not person:
+            st.error("❌ Please enter your name.")
+        elif len(selected_days) != 2:
+            st.error("❌ Select exactly 2 different days.")
         else:
-            if insert_oasis(pool, person, selected_days[0], selected_days[1]):
+            if insert_oasis(pool, person.strip(), selected_days[0], selected_days[1]):
                 st.success("✅ Oasis preference submitted!")
+
 
 
 # --- Allocations ---
