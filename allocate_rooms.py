@@ -39,12 +39,10 @@ def run_allocation(database_url):
         used_rooms = {d: [] for d in day_mapping.values()}
         team_to_days = {}
         team_to_prefdays = {}
-        unallocated_teams = []
 
         for team_name, team_size, preferred_str in team_preferences:
             preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
             if len(preferred_days) != 2:
-                unallocated_teams.append(team_name)
                 continue
             d1, d2 = day_mapping[preferred_days[0]], day_mapping[preferred_days[1]]
             team_to_prefdays[team_name] = {d1, d2}
@@ -60,23 +58,25 @@ def run_allocation(database_url):
                 used_rooms[d1].append(room1)
                 used_rooms[d2].append(room2)
                 team_to_days[team_name] = [d1, d2]
-            else:
-                unallocated_teams.append(team_name)
 
-        # --- Fallback: assign to only 1 non-preferred day ---
-        random.shuffle(unallocated_teams)
-        for team_name in unallocated_teams:
+        # --- Fallback for teams with < 2 days ---
+        teams_needing_more = [team for team in team_to_prefdays if len(team_to_days.get(team, [])) < 2]
+        random.shuffle(teams_needing_more)
+
+        for team_name in teams_needing_more:
+            assigned = set(team_to_days.get(team_name, []))
+            preferred = team_to_prefdays[team_name]
             team_size = next(size for name, size, _ in team_preferences if name == team_name)
-            preferred_dates = team_to_prefdays.get(team_name, set())
+
             for date in day_mapping.values():
-                if date in preferred_dates:
+                if date in preferred or date in assigned:
                     continue
                 available = [r for r in project_rooms if r["capacity"] >= team_size and r["name"] not in used_rooms[date]]
                 if available:
                     room = random.choice(available)["name"]
                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (team_name, room, date))
                     used_rooms[date].append(room)
-                    team_to_days[team_name] = [date]
+                    team_to_days.setdefault(team_name, []).append(date)
                     break
 
         # --- Oasis Allocation ---
@@ -93,7 +93,6 @@ def run_allocation(database_url):
             for person_name, preferred_str in person_rows:
                 preferred_days = [d.strip() for d in preferred_str.split(",") if d.strip() in day_mapping]
                 if len(preferred_days) != 2:
-                    oasis_unplaced.append(person_name)
                     continue
                 d1, d2 = day_mapping[preferred_days[0]], day_mapping[preferred_days[1]]
                 person_to_prefdays[person_name] = {d1, d2}
@@ -104,20 +103,21 @@ def run_allocation(database_url):
                     oasis_used[d1].add(person_name)
                     oasis_used[d2].add(person_name)
                     person_to_days[person_name] = [d1, d2]
-                else:
-                    oasis_unplaced.append(person_name)
 
-            # Fallback: assign to only 1 non-preferred day
-            random.shuffle(oasis_unplaced)
-            for person_name in oasis_unplaced:
-                preferred_dates = person_to_prefdays.get(person_name, set())
+            # Fallback for people with < 2 days
+            people_needing_more = [p for p in person_to_prefdays if len(person_to_days.get(p, [])) < 2]
+            random.shuffle(people_needing_more)
+
+            for person_name in people_needing_more:
+                assigned = set(person_to_days.get(person_name, []))
+                preferred = person_to_prefdays[person_name]
                 for date in day_mapping.values():
-                    if date in preferred_dates:
+                    if date in preferred or date in assigned:
                         continue
                     if len(oasis_used[date]) < oasis["capacity"]:
                         cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name, "Oasis", date))
                         oasis_used[date].add(person_name)
-                        person_to_days[person_name] = [date]
+                        person_to_days.setdefault(person_name, []).append(date)
                         break
 
         conn.commit()
