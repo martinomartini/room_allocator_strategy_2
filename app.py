@@ -349,7 +349,7 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Build matrix with checkmarks (✅ or empty)
+    # Build matrix with ✅ and ""
     unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
     matrix = pd.DataFrame("", index=unique_names, columns=day_names)
 
@@ -362,40 +362,47 @@ try:
             elif signed_up.tolist().count(name) > 0:
                 matrix.at[name, label] = "✅"
             elif count.sum() >= capacity:
-                matrix.at[name, label] = "❌ FULL"  # optional visual block
+                matrix.at[name, label] = "❌ FULL"
+            else:
+                matrix.at[name, label] = ""
 
     # Add availability row
     used_per_day = df.groupby("Date").size().to_dict()
     availability = [f"{max(0, capacity - used_per_day.get(day, 0))} left" for day in days]
     matrix.loc["🪑 Available"] = availability
 
-    # Editable grid
-    editable = matrix.copy()
-    for label in day_names:
-        editable[label] = editable[label].replace({"✅": True, "": False, "❌ FULL": False})
-    edited = st.data_editor(editable, use_container_width=True, key="editable_oasis")
+    # Configure columns as text to avoid True/False conversion
+    col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
+
+    edited = st.data_editor(
+        matrix.drop("🪑 Available"),
+        column_config=col_config,
+        use_container_width=True,
+        key="oasis_matrix_editor"
+    )
 
     if st.button("💾 Save Oasis Matrix"):
         with conn.cursor() as cur:
             cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
             for name in edited.index:
-                if name in ["🪑 Available", "Niek"]:
+                if name == "Niek":
                     continue
-                selected_days = [label for label in day_names if edited.at[name, label]]
+                selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
                 if len(selected_days) > 2:
                     st.warning(f"{name} selected more than 2 days – skipping.")
                     continue
                 for label in selected_days:
-                    day_date = this_monday + timedelta(days=day_names.index(label))
+                    date_obj = this_monday + timedelta(days=day_names.index(label))
                     cur.execute(
                         "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                        (name, "Oasis", day_date)
+                        (name, "Oasis", date_obj)
                     )
             conn.commit()
-            st.success("✅ Changes saved.")
+            st.success("✅ Matrix saved.")
 
 except Exception as e:
     st.error(f"❌ Error: {e}")
 finally:
     return_connection(pool, conn)
+
 
