@@ -37,42 +37,64 @@ def get_connection(pool): return pool.getconn()
 def return_connection(pool, conn): pool.putconn(conn)
 
 # --- DB Functions ---
+import pandas as pd
+from datetime import datetime, timedelta
+import pytz
+from psycopg2.extras import RealDictCursor
+
 def get_room_grid(pool):
-    conn = get_connection(pool)
+    # Get start of current week (Monday)
+    OFFICE_TIMEZONE = pytz.timezone("Europe/Amsterdam")
+    today = datetime.now(OFFICE_TIMEZONE).date()
+    this_monday = today - timedelta(days=today.weekday())
+    day_mapping = {
+        this_monday + timedelta(days=0): "Monday",
+        this_monday + timedelta(days=1): "Tuesday",
+        this_monday + timedelta(days=2): "Wednesday",
+        this_monday + timedelta(days=3): "Thursday"
+    }
+
+    conn = pool.getconn()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Fetch project room allocations (not Oasis)
             cur.execute("""
-                SELECT wa.team_name, wp.contact_person, wa.room_name, wa.date
-                FROM weekly_allocations wa
-                LEFT JOIN weekly_preferences wp ON wa.team_name = wp.team_name
+                SELECT team_name, room_name, date
+                FROM weekly_allocations
+                WHERE room_name != 'Oasis'
             """)
-            data = cur.fetchall()
-            if not data:
-                return pd.DataFrame()
-            df = pd.DataFrame(data, columns=["Team", "Contact", "Room", "Date"])
-            df["Date"] = pd.to_datetime(df["Date"])
-            df["Day"] = df["Date"].dt.strftime('%A')
+            allocations = cur.fetchall()
 
-            project_df = df[df["Room"] != "Oasis"]
-            all_rooms = list({room["name"] for room in AVAILABLE_ROOMS if room["name"] != "Oasis"})
-            all_days = ["Monday", "Tuesday", "Wednesday", "Thursday"]
-            full_index = pd.MultiIndex.from_product([all_rooms, all_days], names=["Room", "Day"])
+            # Fetch contact info
+            cur.execute("""
+                SELECT team_name, contact_person
+                FROM weekly_preferences
+            """)
+            contacts = {row["team_name"]: row["contact_person"] for row in cur.fetchall()}
 
-            project_df["Display"] = project_df["Team"] + " (" + project_df["Contact"] + ")"
-            grouped = project_df.groupby(["Room", "Day"])["Display"].apply(lambda x: ", ".join(sorted(set(x))))
-            grouped = grouped.reindex(full_index, fill_value="Vacant").reset_index()
-            pivot = grouped.pivot(index="Room", columns="Day", values="Display").fillna("Vacant")
-            pivot = pivot.reset_index()
+        # Build room allocation grid
+        grid = {}
+        for row in allocations:
+            team = row["team_name"]
+            room = row["room_name"]
+            date = row["date"]
+            day = day_mapping.get(date)
 
-            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday"]
-            pivot = pivot[["Room"] + [day for day in day_order if day in pivot.columns]]
+            if day is None:
+                continue
 
-            return pivot
-    except Exception as e:
-        st.warning(f"Failed to load allocation data: {e}")
-        return pd.DataFrame()
+            if room not in grid:
+                grid[room] = {"Room": room, "Monday": "Vacant", "Tuesday": "Vacant", "Wednesday": "Vacant", "Thursday": "Vacant"}
+
+            contact = contacts.get(team)
+            label = f"{team} ({contact})" if contact else team
+            grid[room][day] = label
+
+        return pd.DataFrame(grid.values())
+
     finally:
-        return_connection(pool, conn)
+        pool.putconn(conn)
+
 
 def get_oasis_grid(pool):
     conn = get_connection(pool)
