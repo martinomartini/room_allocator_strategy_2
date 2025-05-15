@@ -349,53 +349,45 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Get all people who ever signed up or are in the system
-    unique_names = sorted(set(df["Name"]).union({"Niek"}))
-    matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
+    # Build matrix with ✅ and ""
+    unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
+    matrix = pd.DataFrame("", index=unique_names, columns=day_names)
 
     for day, label in zip(days, day_names):
         signed_up = df[df["Date"] == day]["Name"]
+        count = signed_up.value_counts()
         for name in unique_names:
             if name == "Niek":
-                matrix.at[name, label] = True
-            elif name in signed_up.values:
-                matrix.at[name, label] = True
+                matrix.at[name, label] = "✅"
+            elif signed_up.tolist().count(name) > 0:
+                matrix.at[name, label] = "✅"
+            elif count.sum() >= capacity:
+                matrix.at[name, label] = "❌ FULL"
+            else:
+                matrix.at[name, label] = ""
 
-    # Add 'Available' row to show how many spots left
+    # Add availability row
     used_per_day = df.groupby("Date").size().to_dict()
-    available_row = {}
-    for day, label in zip(days, day_names):
-        used = used_per_day.get(day, 0)
-        available_row[label] = f"{max(0, capacity - used)} spots left"
-    matrix.loc["🪑 Available"] = available_row
+    availability = [f"{max(0, capacity - used_per_day.get(day, 0))} left" for day in days]
+    matrix.loc["🪑 Available"] = availability
 
-    # Disable editing on Niek and availability row
-    disabled_rows = ["🪑 Available"]
-    disabled_cells = {
-        (r, c): True
-        for r in matrix.index
-        for c in matrix.columns
-        if r in disabled_rows or (r != "Niek" and matrix.loc[r, c] == True and used_per_day.get(days[day_names.index(c)], 0) >= capacity)
-    }
+    # Configure columns as text to avoid True/False conversion
+    col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
 
-    # Show matrix with checkboxes
     edited = st.data_editor(
         matrix.drop("🪑 Available"),
-        disabled=disabled_cells,
+        column_config=col_config,
         use_container_width=True,
-        key="oasis_boolean_matrix"
+        key="oasis_matrix_editor"
     )
-
-    # Re-attach visual capacity row for clarity
-    full_view = pd.concat([edited, pd.DataFrame([available_row], index=["🪑 Available"])])
-
-    st.dataframe(full_view)
 
     if st.button("💾 Save Oasis Matrix"):
         with conn.cursor() as cur:
             cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
             for name in edited.index:
-                selected_days = [label for label in day_names if edited.at[name, label]]
+                if name == "Niek":
+                    continue
+                selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
                 if len(selected_days) > 2:
                     st.warning(f"{name} selected more than 2 days – skipping.")
                     continue
@@ -406,12 +398,11 @@ try:
                         (name, "Oasis", date_obj)
                     )
             conn.commit()
-            st.success("✅ Matrix saved!")
+            st.success("✅ Matrix saved.")
 
 except Exception as e:
     st.error(f"❌ Error: {e}")
 finally:
     return_connection(pool, conn)
-
 
 
