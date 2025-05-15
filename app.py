@@ -328,6 +328,60 @@ if alloc_df.empty:
 else:
     st.dataframe(alloc_df, use_container_width=True)
 
+from datetime import timedelta
+
+today = datetime.now(OFFICE_TIMEZONE).date()
+this_monday = today - timedelta(days=today.weekday())
+
+st.header("🆕 Add Yourself to Oasis Allocation")
+with st.form("oasis_add_form"):
+    new_name = st.text_input("Your Name")
+    new_days = st.multiselect("Select one or more days:", ["Monday", "Tuesday", "Wednesday", "Thursday"])
+    add_submit = st.form_submit_button("➕ Add me to the schedule")
+
+    if add_submit:
+        if not new_name.strip():
+            st.error("❌ Please enter your name.")
+        elif len(new_days) == 0:
+            st.error("❌ Select at least one day.")
+        else:
+            conn = None
+            try:
+                conn = get_connection(pool)
+                with conn.cursor() as cur:
+                    name_clean = new_name.strip().title()
+
+                    # Remove existing entries for this user
+                    cur.execute("""
+                        DELETE FROM weekly_allocations
+                        WHERE room_name = 'Oasis' AND team_name = %s
+                    """, (name_clean,))
+
+                    for day in new_days:
+                        date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
+
+                        # Check current occupancy
+                        cur.execute("""
+                            SELECT COUNT(*) FROM weekly_allocations
+                            WHERE room_name = 'Oasis' AND date = %s
+                        """, (date_obj,))
+                        count = cur.fetchone()[0]
+
+                        if count >= oasis["capacity"]:
+                            st.warning(f"Oasis is full on {day}, not added.")
+                        else:
+                            cur.execute("""
+                                INSERT INTO weekly_allocations (team_name, room_name, date)
+                                VALUES (%s, 'Oasis', %s)
+                            """, (name_clean, date_obj))
+
+                    conn.commit()
+                    st.success("✅ You're added to the selected days!")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+            finally:
+                if conn:
+                    return_connection(pool, conn)
 
 st.header("📊 Full Weekly Oasis Overview")
 
