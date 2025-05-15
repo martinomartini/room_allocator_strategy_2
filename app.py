@@ -386,9 +386,11 @@ with st.form("oasis_add_form"):
 st.header("📊 Full Weekly Oasis Overview")
 st.subheader("🪑 Oasis Availability Summary")
 
+from datetime import datetime, timedelta
+
 today = datetime.now(OFFICE_TIMEZONE).date()
 this_monday = today - timedelta(days=today.weekday())
-days = [(this_monday + timedelta(days=i)) for i in range(5)]  # Monday–Friday
+days = [(this_monday + timedelta(days=i)) for i in range(5)]  # Include Friday
 day_names = [d.strftime("%A") for d in days]
 capacity = oasis["capacity"]
 
@@ -403,60 +405,54 @@ try:
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
     # Build initial matrix
-    unique_names = sorted(set(df["Name"]).union({"Niek"}))
-    matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
+    all_names = sorted(set(df["Name"]).union({"Niek"}))
+    matrix = pd.DataFrame(False, index=all_names, columns=day_names)
 
     for _, row in df.iterrows():
-        name = row["Name"]
-        date = row["Date"]
-        day_label = date.strftime("%A")
-        if name in matrix.index and day_label in matrix.columns:
-            matrix.at[name, day_label] = True
+        name, date = row["Name"], row["Date"]
+        day = date.strftime("%A")
+        if day in day_names and name in matrix.index:
+            matrix.at[name, day] = True
 
-    # Calculate availability
-    used_per_day = matrix.sum(axis=0).to_dict()
-    availability = {day: max(0, capacity - used_per_day.get(day, 0)) for day in day_names}
-
-    # Display availability summary
+    # Force Niek always checked and count as present
     for day in day_names:
-        st.markdown(f"**{day}:** {availability[day]} spots left")
+        matrix.at["Niek", day] = True
 
-    edited = st.data_editor(
-        matrix,
-        use_container_width=True,
-        key="oasis_matrix_editor",
-        disabled={"Niek": [True] * len(day_names)} if "Niek" in matrix.index else None
-    )
+    # Show availability above table
+    usage_counts = matrix.sum(axis=0)
+    for day in day_names:
+        spots_left = max(0, capacity - usage_counts[day])
+        st.markdown(f"**{day}**: {spots_left} spots left")
+
+    # Display editable matrix
+    col_config = {day: st.column_config.CheckboxColumn(label=day) for day in day_names}
+    edited = st.data_editor(matrix, column_config=col_config, use_container_width=True, key="oasis_matrix_editor")
 
     if st.button("💾 Save Oasis Matrix"):
         try:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
+
+                inserted_counts = {day: 1 if edited.at["Niek", day] else 0 for day in day_names}
+
                 for name in edited.index:
                     if name == "Niek":
                         continue
-                    selected_days = [day for day in day_names if edited.at[name, day]]
-                    if len(selected_days) > 5:
-                        st.warning(f"{name} selected too many days – skipping.")
-                        continue
-                    for day in selected_days:
-                        if availability[day] > 0:
-                            date_obj = this_monday + timedelta(days=day_names.index(day))
-                            cur.execute(
-                                "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                (name, "Oasis", date_obj)
-                            )
-                            availability[day] -= 1
-                        else:
-                            st.warning(f"{name} could not be added to {day}: full.")
+                    for day in day_names:
+                        if edited.at[name, day]:
+                            if inserted_counts[day] < capacity:
+                                date_obj = this_monday + timedelta(days=day_names.index(day))
+                                cur.execute(
+                                    "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                                    (name, "Oasis", date_obj)
+                                )
+                                inserted_counts[day] += 1
+                            else:
+                                st.warning(f"{name} could not be added to {day}: full.")
                 conn.commit()
                 st.success("✅ Matrix saved.")
         except Exception as e:
             st.error(f"❌ Failed to save matrix: {e}")
-
-except Exception as e:
-    st.error(f"❌ Error loading matrix: {e}")
 finally:
     if conn:
         return_connection(pool, conn)
-
