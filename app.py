@@ -358,7 +358,7 @@ with st.form("oasis_add_form"):
                     """, (name_clean,))
 
                     for day in new_days:
-                        date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
+                        date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].index(day))
 
                         # Check current occupancy
                         cur.execute("""
@@ -382,14 +382,13 @@ with st.form("oasis_add_form"):
             finally:
                 if conn:
                     return_connection(pool, conn)
-
 st.header("📊 Full Weekly Oasis Overview")
 
 from datetime import timedelta
 
 today = datetime.now(OFFICE_TIMEZONE).date()
 this_monday = today - timedelta(days=today.weekday())
-days = [(this_monday + timedelta(days=i)) for i in range(4)]
+days = [(this_monday + timedelta(days=i)) for i in range(5)]  # Now includes Friday
 day_names = [d.strftime("%A") for d in days]
 capacity = oasis["capacity"]
 
@@ -407,62 +406,54 @@ try:
     unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
     matrix = pd.DataFrame("", index=unique_names, columns=day_names)
 
+    availability = []
+
     for day, label in zip(days, day_names):
         signed_up = df[df["Date"] == day]["Name"]
-        count = signed_up.value_counts()
         for name in unique_names:
             if name == "Niek":
                 matrix.at[name, label] = "✅"
-            elif signed_up.tolist().count(name) > 0:
+            elif name in signed_up.values:
                 matrix.at[name, label] = "✅"
-            elif count.sum() >= capacity:
-                matrix.at[name, label] = "❌ FULL"
             else:
                 matrix.at[name, label] = ""
 
-    # Add availability row
-    used_per_day = df.groupby("Date").size().to_dict()
-    availability = [f"{max(0, capacity - used_per_day.get(day, 0))} left" for day in days]
-    matrix.loc["🪑 Available"] = availability
+        # Track available spots for this day
+        used = signed_up.nunique()
+        availability.append(f"**{label}**: {max(0, capacity - used)} spots left")
 
-    # Configure columns as text
+    # Show availability summary above
+    st.markdown("### 🪑 Oasis Availability Summary")
+    st.markdown("<br>".join(availability), unsafe_allow_html=True)
+
+    # Configure columns
     col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
 
     edited = st.data_editor(
-        matrix.drop("🪑 Available"),
+        matrix,
         column_config=col_config,
         use_container_width=True,
         key="oasis_matrix_editor"
     )
 
     if st.button("💾 Save Oasis Matrix"):
-        conn_admin_save = None  # Separate conn for save
         try:
-            conn_admin_save = get_connection(pool)
-            with conn_admin_save.cursor() as cur:
+            with conn.cursor() as cur:
                 cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
                 for name in edited.index:
                     if name == "Niek":
                         continue
                     selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
-                    if len(selected_days) > 2:
-                        st.warning(f"{name} selected more than 2 days – skipping.")
-                        continue
                     for label in selected_days:
                         date_obj = this_monday + timedelta(days=day_names.index(label))
                         cur.execute(
                             "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                             (name, "Oasis", date_obj)
                         )
-                conn_admin_save.commit()
+                conn.commit()
                 st.success("✅ Matrix saved.")
         except Exception as e:
-            if conn_admin_save:
-                conn_admin_save.rollback()
             st.error(f"❌ Failed to save matrix: {e}")
-        finally:
-            if conn_admin_save:
-                return_connection(pool, conn_admin_save)
 
 except Exception as e:
     st.error(f"❌ Error loading matrix: {e}")
