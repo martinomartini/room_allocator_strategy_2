@@ -230,7 +230,7 @@ def reset_allocations(pool):
         return_connection(pool, conn)
 
 # --- UI ---
-st.title("📅 Weekly Room Allocator")
+st.title("📅 Weekly Room Allocator for strategy")
 st.info("""
 💡 **How This Works:**
 
@@ -503,7 +503,7 @@ this_monday = today - timedelta(days=today.weekday())
 st.header("🆕 Add Yourself to Oasis Allocation")
 with st.form("oasis_add_form"):
     new_name = st.text_input("Your Name")
-    new_days = st.multiselect("Select one or more days:", ["Monday", "Tuesday", "Wednesday", "Thursday"])
+    new_days = st.multiselect("Select one or more days:", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
     add_submit = st.form_submit_button("➕ Add me to the schedule")
 
     if add_submit:
@@ -570,7 +570,7 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
+    unique_names = sorted(set(df["Name"]).union({"Bud"}))  # Always include Bud
     matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
 
     for day, label in zip(days, day_names):
@@ -578,15 +578,15 @@ try:
         for name in signed_up:
             matrix.at[name, label] = True
     for day in day_names:
-        matrix.at["Niek", day] = True  # Force Niek to always be signed up
+        matrix.at["Bud", day] = True  # Force Bud to always be signed up
 
     # --- Display availability ---
     st.subheader("🪑 Oasis Availability Summary")
     used_per_day = df.groupby("Date").size().to_dict()
     for day, label in zip(days, day_names):
         used = used_per_day.get(day, 0)
-        if matrix.at["Niek", label]:
-            used += 0 if "Niek" not in df[df["Date"] == day]["Name"].values else 0
+        if matrix.at["Bud", label]:
+            used += 0 if "Bud" not in df[df["Date"] == day]["Name"].values else 0
         left = max(0, capacity - used)
         st.markdown(f"**{label}**: {left} spots left")
 
@@ -594,18 +594,18 @@ try:
     edited = st.data_editor(
         matrix,
         use_container_width=True,
-        disabled=["Niek"],
+        disabled=["Bud"],
         key="oasis_matrix_editor"
     )
 
     if st.button("💾 Save Oasis Matrix"):
         try:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
-                inserted_counts = {day: 1 if matrix.at["Niek", day] else 0 for day in day_names}
+                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Bud'")
+                inserted_counts = {day: 1 if matrix.at["Bud", day] else 0 for day in day_names}
 
                 for name in edited.index:
-                    if name == "Niek":
+                    if name == "Bud":
                         continue
                     for day in day_names:
                         if edited.at[name, day]:
