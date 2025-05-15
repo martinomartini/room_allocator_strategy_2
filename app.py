@@ -382,8 +382,10 @@ try:
     )
 
     if st.button("💾 Save Oasis Matrix"):
+        conn_admin_save = None  # Separate conn for save
         try:
-            with conn.cursor() as cur:
+            conn_admin_save = get_connection(pool)
+            with conn_admin_save.cursor() as cur:
                 cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
                 for name in edited.index:
                     if name == "Niek":
@@ -398,10 +400,18 @@ try:
                             "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
                             (name, "Oasis", date_obj)
                         )
-                conn.commit()
+                conn_admin_save.commit()
                 st.success("✅ Matrix saved.")
         except Exception as e:
+            if conn_admin_save:
+                conn_admin_save.rollback()
             st.error(f"❌ Failed to save matrix: {e}")
+        finally:
+            if conn_admin_save:
+                return_connection(pool, conn_admin_save)
+
+except Exception as e:
+    st.error(f"❌ Error loading matrix: {e}")
 finally:
     if conn:
         return_connection(pool, conn)
