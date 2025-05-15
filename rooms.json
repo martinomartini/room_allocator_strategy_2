@@ -1,10 +1,7 @@
 [
-  { "name": "Room D0206", "capacity": 6 },
-  { "name": "Room D0207", "capacity": 4 },
-  { "name": "Room D0208", "capacity": 4 },
-  { "name": "Room D0289", "capacity": 4 },
-  { "name": "Room D0290", "capacity": 4 },
-  { "name": "Room D0291", "capacity": 4 },
-  { "name": "Room D0292", "capacity": 4 },
-  { "name": "Oasis", "capacity": 15 }
+  { "name": "Room D0209", "capacity": 5 },
+  { "name": "Room D0284", "capacity": 4 },
+  { "name": "Room D0285", "capacity": 4 },
+  { "name": "Room D0286", "capacity": 4 },
+  { "name": "Oasis", "capacity": 17 }
 ]
