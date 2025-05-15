@@ -367,7 +367,7 @@ with st.form("oasis_add_form"):
                                 WHERE room_name = 'Oasis' AND date = %s
                             """, (date_obj,))
                             count = cur.fetchone()[0]
-                            if count >= oasis:
+                            if count >= oasis["capacity"]:
                                 st.warning(f"Oasis is full on {day}, not added.")
                             else:
                                 cur.execute("""
