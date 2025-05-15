@@ -384,8 +384,7 @@ with st.form("oasis_add_form"):
                     return_connection(pool, conn)
 
 st.header("📊 Full Weekly Oasis Overview")
-
-from datetime import timedelta
+st.subheader("🪑 Oasis Availability Summary")
 
 today = datetime.now(OFFICE_TIMEZONE).date()
 this_monday = today - timedelta(days=today.weekday())
@@ -403,32 +402,30 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Build matrix
-    unique_names = sorted(df["Name"].unique())
-    matrix = pd.DataFrame("", index=unique_names, columns=day_names)
+    # Build initial matrix
+    unique_names = sorted(set(df["Name"]).union({"Niek"}))
+    matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
 
-    for day, label in zip(days, day_names):
-        signed_up = df[df["Date"] == day]["Name"]
-        for name in unique_names:
-            if signed_up.tolist().count(name) > 0:
-                matrix.at[name, label] = "✅"
-            else:
-                matrix.at[name, label] = ""
+    for _, row in df.iterrows():
+        name = row["Name"]
+        date = row["Date"]
+        day_label = date.strftime("%A")
+        if name in matrix.index and day_label in matrix.columns:
+            matrix.at[name, day_label] = True
 
-    # Initial availability summary
-    used_per_day = df.groupby("Date").size().to_dict()
-    availability = [f"**{label}**: {max(0, capacity - used_per_day.get(day, 0))} spots left" for day, label in zip(days, day_names)]
+    # Calculate availability
+    used_per_day = matrix.sum(axis=0).to_dict()
+    availability = {day: max(0, capacity - used_per_day.get(day, 0)) for day in day_names}
 
-    st.subheader("🪑 Oasis Availability Summary")
-    st.markdown("<br>".join(availability), unsafe_allow_html=True)
+    # Display availability summary
+    for day in day_names:
+        st.markdown(f"**{day}:** {availability[day]} spots left")
 
-    # Editable table
-    col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
     edited = st.data_editor(
         matrix,
-        column_config=col_config,
         use_container_width=True,
-        key="oasis_matrix_editor"
+        key="oasis_matrix_editor",
+        disabled={"Niek": [True] * len(day_names)} if "Niek" in matrix.index else None
     )
 
     if st.button("💾 Save Oasis Matrix"):
@@ -436,30 +433,24 @@ try:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
                 for name in edited.index:
-                    selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
-                    for label in selected_days:
-                        date_obj = this_monday + timedelta(days=day_names.index(label))
-                        cur.execute(
-                            "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                            (name, "Oasis", date_obj)
-                        )
+                    if name == "Niek":
+                        continue
+                    selected_days = [day for day in day_names if edited.at[name, day]]
+                    if len(selected_days) > 5:
+                        st.warning(f"{name} selected too many days – skipping.")
+                        continue
+                    for day in selected_days:
+                        if availability[day] > 0:
+                            date_obj = this_monday + timedelta(days=day_names.index(day))
+                            cur.execute(
+                                "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                                (name, "Oasis", date_obj)
+                            )
+                            availability[day] -= 1
+                        else:
+                            st.warning(f"{name} could not be added to {day}: full.")
                 conn.commit()
-            st.success("✅ Matrix saved.")
-
-            # 🔄 Refresh and show updated availability
-            with conn.cursor() as cur:
-                cur.execute("SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis'")
-                rows = cur.fetchall()
-
-            df_updated = pd.DataFrame(rows, columns=["Name", "Date"])
-            df_updated["Date"] = pd.to_datetime(df_updated["Date"]).dt.date
-            st.subheader("🪑 Oasis Availability Summary (Updated)")
-            new_availability = []
-            for day, label in zip(days, day_names):
-                used = df_updated[df_updated["Date"] == day].Name.nunique()
-                new_availability.append(f"**{label}**: {max(0, capacity - used)} spots left")
-            st.markdown("<br>".join(new_availability), unsafe_allow_html=True)
-
+                st.success("✅ Matrix saved.")
         except Exception as e:
             st.error(f"❌ Failed to save matrix: {e}")
 
@@ -468,3 +459,4 @@ except Exception as e:
 finally:
     if conn:
         return_connection(pool, conn)
+
