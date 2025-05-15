@@ -304,7 +304,7 @@ with st.form("oasis_form"):
     person = st.text_input("Your Name")
     selected_days = st.multiselect(
         "Select Your 2 Preferred Days for Oasis:",
-        ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         max_selections=2
     )
     submit_oasis = st.form_submit_button("Submit Oasis Preference")
@@ -382,13 +382,14 @@ with st.form("oasis_add_form"):
             finally:
                 if conn:
                     return_connection(pool, conn)
+                    
 st.header("📊 Full Weekly Oasis Overview")
 
 from datetime import timedelta
 
 today = datetime.now(OFFICE_TIMEZONE).date()
 this_monday = today - timedelta(days=today.weekday())
-days = [(this_monday + timedelta(days=i)) for i in range(5)]  # Now includes Friday
+days = [(this_monday + timedelta(days=i)) for i in range(5)]  # Monday–Friday
 day_names = [d.strftime("%A") for d in days]
 capacity = oasis["capacity"]
 
@@ -402,7 +403,7 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Build matrix with ✅ and ""
+    # Build matrix with ✅ or empty string
     unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
     matrix = pd.DataFrame("", index=unique_names, columns=day_names)
 
@@ -410,23 +411,16 @@ try:
 
     for day, label in zip(days, day_names):
         signed_up = df[df["Date"] == day]["Name"]
-        for name in unique_names:
-            if name == "Niek":
-                matrix.at[name, label] = "✅"
-            elif name in signed_up.values:
-                matrix.at[name, label] = "✅"
-            else:
-                matrix.at[name, label] = ""
-
-        # Track available spots for this day
         used = signed_up.nunique()
         availability.append(f"**{label}**: {max(0, capacity - used)} spots left")
+        for name in unique_names:
+            if name == "Niek" or name in signed_up.values:
+                matrix.at[name, label] = "✅"
 
-    # Show availability summary above
+    # Show availability above table
     st.markdown("### 🪑 Oasis Availability Summary")
     st.markdown("<br>".join(availability), unsafe_allow_html=True)
 
-    # Configure columns
     col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
 
     edited = st.data_editor(
