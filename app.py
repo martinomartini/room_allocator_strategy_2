@@ -328,67 +328,6 @@ if alloc_df.empty:
 else:
     st.dataframe(alloc_df, use_container_width=True)
     
-st.header("📝 Sign Up for Oasis Days")
-
-with st.form("oasis_signup_form"):
-    name_input = st.text_input("Your Name")
-    selected_days_input = st.multiselect(
-        "Select the days you plan to go to Oasis (max 2):",
-        ["Monday", "Tuesday", "Wednesday", "Thursday"]
-    )
-    submitted = st.form_submit_button("✅ Submit my selection")
-
-    if submitted:
-        if not name_input:
-            st.error("Please enter your name.")
-        elif len(selected_days_input) > 2:
-            st.error("You can select a maximum of 2 days.")
-        else:
-            try:
-                with get_connection(pool) as conn:
-                    with conn.cursor() as cur:
-                        # Get all existing signups for this user
-                        cur.execute(
-                            "SELECT date FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = %s",
-                            (name_input,)
-                        )
-                        existing_dates = [r[0] for r in cur.fetchall()]
-
-                        # Convert labels to dates
-                        selected_dates = [
-                            this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
-                            for day in selected_days_input
-                        ]
-
-                        # Delete previous entries not in current selection
-                        for d in existing_dates:
-                            if d not in selected_dates:
-                                cur.execute(
-                                    "DELETE FROM weekly_allocations WHERE team_name = %s AND room_name = 'Oasis' AND date = %s",
-                                    (name_input, d)
-                                )
-
-                        # Insert new entries
-                        for d in selected_dates:
-                            if d not in existing_dates:
-                                # Check if there's room
-                                cur.execute(
-                                    "SELECT COUNT(*) FROM weekly_allocations WHERE room_name = 'Oasis' AND date = %s",
-                                    (d,)
-                                )
-                                count = cur.fetchone()[0]
-                                if count >= capacity:
-                                    st.warning(f"Oasis is full on {d.strftime('%A')} – not added.")
-                                else:
-                                    cur.execute(
-                                        "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                                        (name_input, "Oasis", d)
-                                    )
-
-                        conn.commit()
-                        st.success("✅ Your Oasis days were saved.")
-            except Exception as e:
-                st.error(f"Something went wrong: {e}")
 
 
 st.header("📊 Full Weekly Oasis Overview")
