@@ -347,37 +347,40 @@ with st.form("oasis_add_form"):
         elif len(new_days) > 2:
             st.error("Select no more than 2 days.")
         else:
+            conn = get_connection(pool)
             try:
-                with get_connection(pool) as conn:
-                    with conn.cursor() as cur:
-                        # Clean name and prevent duplicates
-                        name_clean = new_name.strip().title()
+                with conn.cursor() as cur:
+                    # Clean name and prevent duplicates
+                    name_clean = new_name.strip().title()
 
-                        # Remove old entries for this person (if any)
+                    # Remove old entries for this person (if any)
+                    cur.execute("""
+                        DELETE FROM weekly_allocations
+                        WHERE room_name = 'Oasis' AND team_name = %s
+                    """, (name_clean,))
+
+                    # Insert new selections (if space)
+                    for day in new_days:
+                        date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
                         cur.execute("""
-                            DELETE FROM weekly_allocations
-                            WHERE room_name = 'Oasis' AND team_name = %s
-                        """, (name_clean,))
-
-                        # Insert new selections (if space)
-                        for day in new_days:
-                            date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
+                            SELECT COUNT(*) FROM weekly_allocations
+                            WHERE room_name = 'Oasis' AND date = %s
+                        """, (date_obj,))
+                        count = cur.fetchone()[0]
+                        if count >= oasis["capacity"]:
+                            st.warning(f"Oasis is full on {day}, not added.")
+                        else:
                             cur.execute("""
-                                SELECT COUNT(*) FROM weekly_allocations
-                                WHERE room_name = 'Oasis' AND date = %s
-                            """, (date_obj,))
-                            count = cur.fetchone()[0]
-                            if count >= oasis["capacity"]:
-                                st.warning(f"Oasis is full on {day}, not added.")
-                            else:
-                                cur.execute("""
-                                    INSERT INTO weekly_allocations (team_name, room_name, date)
-                                    VALUES (%s, 'Oasis', %s)
-                                """, (name_clean, date_obj))
-                        conn.commit()
-                        st.success("✅ You're added!")
+                                INSERT INTO weekly_allocations (team_name, room_name, date)
+                                VALUES (%s, 'Oasis', %s)
+                            """, (name_clean, date_obj))
+                conn.commit()
+                st.success("✅ You're added!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
+            finally:
+                return_connection(pool, conn)
+
 
 
 st.header("📊 Full Weekly Oasis Overview")
