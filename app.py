@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOMS_FILE = os.path.join(BASE_DIR, 'rooms.json')
 with open(ROOMS_FILE, 'r') as f:
     AVAILABLE_ROOMS = json.load(f)
-    
+
 oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 12})
 
 @st.cache_resource
@@ -328,7 +328,6 @@ if alloc_df.empty:
 else:
     st.dataframe(alloc_df, use_container_width=True)
 
-# --- Weekly Oasis Matrix Overview ---
 st.header("📊 Full Weekly Oasis Overview")
 
 from datetime import timedelta
@@ -353,23 +352,33 @@ try:
         df = pd.DataFrame(data, columns=["Name", "Date"])
         df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-        # Create pivot matrix
-        pivot = pd.DataFrame(index=sorted(df["Name"].unique()), columns=day_names)
+        # Create editable matrix with booleans
+        unique_names = sorted(df["Name"].unique())
+        matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
+
         for day, label in zip(days, day_names):
             people = df[df["Date"] == day]["Name"]
-            pivot[label] = pivot.index.map(lambda name: "✅" if name in people.values else "")
+            matrix[label] = matrix.index.map(lambda name: True if name in people.values else False)
 
-        # Add availability row
-        spots = {}
-        for day, label in zip(days, day_names):
-            used = df[df["Date"] == day].shape[0]
-            spots[label] = f"{capacity - used} spots left"
-        pivot.loc["🪑 Available"] = [spots[day] for day in day_names]
+        # Show editable grid
+        edited = st.data_editor(matrix, use_container_width=True, key="oasis_matrix")
 
-        st.dataframe(pivot)
+        if st.button("💾 Save All Changes"):
+            with conn.cursor() as cur:
+                # Clear all Oasis rows
+                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis'")
+                # Rebuild entries from edited matrix
+                for name in edited.index:
+                    for label, date in zip(day_names, days):
+                        if edited.at[name, label]:
+                            cur.execute(
+                                "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                                (name, "Oasis", date)
+                            )
+                conn.commit()
+                st.success("✅ Changes saved to database.")
 
+except Exception as e:
+    st.error(f"Error: {e}")
 finally:
     return_connection(pool, conn)
-
-
-st.caption("Room grid is based on weekly_allocations table. Made by Martino Martini")
