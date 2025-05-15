@@ -511,7 +511,7 @@ try:
     for day, label in zip(days, day_names):
         used = used_per_day.get(day, 0)
         if matrix.at["Niek", label]:
-            used += 1 if "Niek" not in df[df["Date"] == day]["Name"].values else 0
+            used += 0 if "Niek" not in df[df["Date"] == day]["Name"].values else 0
         left = max(0, capacity - used)
         st.markdown(f"**{label}**: {left} spots left")
 
