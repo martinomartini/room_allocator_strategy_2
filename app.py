@@ -339,13 +339,12 @@ days = [(this_monday + timedelta(days=i)) for i in range(4)]
 day_names = [d.strftime("%A") for d in days]
 capacity = oasis["capacity"]
 
-conn = get_connection(pool)
+conn = None
 try:
+    conn = get_connection(pool)
     with conn.cursor() as cur:
         cur.execute("SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis'")
         rows = cur.fetchall()
-
-    import pandas as pd
 
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
@@ -372,7 +371,7 @@ try:
     availability = [f"{max(0, capacity - used_per_day.get(day, 0))} left" for day in days]
     matrix.loc["🪑 Available"] = availability
 
-    # Configure columns as text to avoid True/False conversion
+    # Configure columns as text
     col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
 
     edited = st.data_editor(
@@ -383,27 +382,29 @@ try:
     )
 
     if st.button("💾 Save Oasis Matrix"):
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
-            for name in edited.index:
-                if name == "Niek":
-                    continue
-                selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
-                if len(selected_days) > 2:
-                    st.warning(f"{name} selected more than 2 days – skipping.")
-                    continue
-                for label in selected_days:
-                    date_obj = this_monday + timedelta(days=day_names.index(label))
-                    cur.execute(
-                        "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                        (name, "Oasis", date_obj)
-                    )
-            conn.commit()
-            st.success("✅ Matrix saved.")
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
+                for name in edited.index:
+                    if name == "Niek":
+                        continue
+                    selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
+                    if len(selected_days) > 2:
+                        st.warning(f"{name} selected more than 2 days – skipping.")
+                        continue
+                    for label in selected_days:
+                        date_obj = this_monday + timedelta(days=day_names.index(label))
+                        cur.execute(
+                            "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
+                            (name, "Oasis", date_obj)
+                        )
+                conn.commit()
+                st.success("✅ Matrix saved.")
+        except Exception as e:
+            st.error(f"❌ Failed to save matrix: {e}")
 
 except Exception as e:
-    st.error(f"❌ Error: {e}")
+    st.error(f"❌ Error loading matrix: {e}")
 finally:
-    return_connection(pool, conn)
-
-
+    if conn:
+        return_connection(pool, conn)
