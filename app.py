@@ -453,7 +453,7 @@ try:
                                 st.warning(f"{name} could not be added to {day}: full.")
                 conn.commit()
                 st.success("✅ Matrix saved.")
-                st.experimental_rerun()
+                st.rerun()
         except Exception as e:
             st.error(f"❌ Failed to save matrix: {e}")
 
