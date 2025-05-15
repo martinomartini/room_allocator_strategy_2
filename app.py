@@ -43,7 +43,7 @@ import pytz
 from psycopg2.extras import RealDictCursor
 
 def get_room_grid(pool):
-    # Get start of current week (Monday)
+    # Set up current week's Monday and day mapping
     OFFICE_TIMEZONE = pytz.timezone("Europe/Amsterdam")
     today = datetime.now(OFFICE_TIMEZONE).date()
     this_monday = today - timedelta(days=today.weekday())
@@ -54,10 +54,22 @@ def get_room_grid(pool):
         this_monday + timedelta(days=3): "Thursday"
     }
 
+    day_labels = list(day_mapping.values())
+
+    # Load all room names from rooms.json (excluding Oasis)
+    with open("rooms.json") as f:
+        all_rooms = [r["name"] for r in json.load(f) if r["name"] != "Oasis"]
+
+    # Start with every room marked Vacant
+    grid = {
+        room: {**{"Room": room}, **{day: "Vacant" for day in day_labels}}
+        for room in all_rooms
+    }
+
     conn = pool.getconn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch project room allocations (not Oasis)
+            # Fetch project room allocations
             cur.execute("""
                 SELECT team_name, room_name, date
                 FROM weekly_allocations
@@ -65,26 +77,22 @@ def get_room_grid(pool):
             """)
             allocations = cur.fetchall()
 
-            # Fetch contact info
+            # Fetch team contact info
             cur.execute("""
                 SELECT team_name, contact_person
                 FROM weekly_preferences
             """)
             contacts = {row["team_name"]: row["contact_person"] for row in cur.fetchall()}
 
-        # Build room allocation grid
-        grid = {}
+        # Fill in the grid with actual allocations
         for row in allocations:
             team = row["team_name"]
             room = row["room_name"]
             date = row["date"]
             day = day_mapping.get(date)
 
-            if day is None:
+            if room not in grid or not day:
                 continue
-
-            if room not in grid:
-                grid[room] = {"Room": room, "Monday": "Vacant", "Tuesday": "Vacant", "Wednesday": "Vacant", "Thursday": "Vacant"}
 
             contact = contacts.get(team)
             label = f"{team} ({contact})" if contact else team
