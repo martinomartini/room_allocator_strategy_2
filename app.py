@@ -328,6 +328,50 @@ if alloc_df.empty:
 else:
     st.dataframe(alloc_df, use_container_width=True)
     
+st.header("🆕 Add Yourself to Oasis Allocation")
+
+with st.form("oasis_add_form"):
+    new_name = st.text_input("Your Name")
+    new_days = st.multiselect("Select up to 2 days:", ["Monday", "Tuesday", "Wednesday", "Thursday"])
+    add_submit = st.form_submit_button("➕ Add me to the schedule")
+
+    if add_submit:
+        if not new_name.strip():
+            st.error("Please enter your name.")
+        elif len(new_days) > 2:
+            st.error("Select no more than 2 days.")
+        else:
+            try:
+                with get_connection(pool) as conn:
+                    with conn.cursor() as cur:
+                        # Clean name and prevent duplicates
+                        name_clean = new_name.strip().title()
+
+                        # Remove old entries for this person (if any)
+                        cur.execute("""
+                            DELETE FROM weekly_allocations
+                            WHERE room_name = 'Oasis' AND team_name = %s
+                        """, (name_clean,))
+
+                        # Insert new selections (if space)
+                        for day in new_days:
+                            date_obj = this_monday + timedelta(days=["Monday", "Tuesday", "Wednesday", "Thursday"].index(day))
+                            cur.execute("""
+                                SELECT COUNT(*) FROM weekly_allocations
+                                WHERE room_name = 'Oasis' AND date = %s
+                            """, (date_obj,))
+                            count = cur.fetchone()[0]
+                            if count >= capacity:
+                                st.warning(f"Oasis is full on {day}, not added.")
+                            else:
+                                cur.execute("""
+                                    INSERT INTO weekly_allocations (team_name, room_name, date)
+                                    VALUES (%s, 'Oasis', %s)
+                                """, (name_clean, date_obj))
+                        conn.commit()
+                        st.success("✅ You're added!")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
 
 st.header("📊 Full Weekly Oasis Overview")
