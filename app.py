@@ -402,9 +402,6 @@ try:
                 st.success("✅ Matrix saved.")
         except Exception as e:
             st.error(f"❌ Failed to save matrix: {e}")
-
-except Exception as e:
-    st.error(f"❌ Error loading matrix: {e}")
 finally:
     if conn:
         return_connection(pool, conn)
