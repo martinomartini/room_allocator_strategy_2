@@ -26,26 +26,26 @@ with open(ROOMS_FILE, "r") as f:
 project_rooms = [r for r in rooms if r["name"] != "Oasis"]
 oasis = next((r for r in rooms if r["name"] == "Oasis"), None)
 
-# --- Main Allocation ---
 def run_allocation(database_url, only=None):
-    import psycopg2
-    import random
-
     try:
         conn = psycopg2.connect(database_url)
         cur = conn.cursor()
-        cur.execute("DELETE FROM weekly_allocations")
 
+        # --- Delete only relevant allocations ---
+        if only == "project":
+            cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis'")
+        elif only == "oasis":
+            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis'")
+        else:
+            cur.execute("DELETE FROM weekly_allocations")
+
+        # --- Project Room Allocation ---
         team_to_days = {}
-        person_to_days = {}
-
         if only in [None, "project"]:
-            # --- Project Room Allocation ---
             cur.execute("SELECT team_name, team_size, preferred_days FROM weekly_preferences")
             team_preferences = cur.fetchall()
 
             used_rooms = {d: [] for d in day_mapping.values()}
-
             mon_wed = []
             tue_thu = []
 
@@ -74,7 +74,7 @@ def run_allocation(database_url, only=None):
             assign_combo(mon_wed, "Monday", "Wednesday")
             assign_combo(tue_thu, "Tuesday", "Thursday")
 
-            # --- Fallback ---
+            # Fallback assignment
             placed_teams = set(team_to_days.keys())
             all_teams = {t for t, _, _ in team_preferences}
             unplaced = list(all_teams - placed_teams)
@@ -99,19 +99,21 @@ def run_allocation(database_url, only=None):
                     used_rooms[d2].append(room2)
                     team_to_days[team_name] = [d1, d2]
 
+        # --- Oasis Allocation ---
+        person_to_days = {}
         if only in [None, "oasis"]:
-            # --- Oasis Allocation (5-day logic) ---
             cur.execute("SELECT person_name, preferred_day_1, preferred_day_2, preferred_day_3, preferred_day_4, preferred_day_5 FROM oasis_preferences")
             person_rows = cur.fetchall()
             random.shuffle(person_rows)
 
             oasis_used = {d: set() for d in day_mapping.values()}
+
             person_prefs = {
                 name: [d for d in [d1, d2, d3, d4, d5] if d and d in day_mapping]
                 for name, d1, d2, d3, d4, d5 in person_rows
             }
 
-            # Round 1: Give everyone one preferred day
+            # Round 1: assign everyone one preferred day
             for name, prefs in person_prefs.items():
                 for day in prefs:
                     date = day_mapping[day]
@@ -121,7 +123,7 @@ def run_allocation(database_url, only=None):
                         person_to_days[name] = [date]
                         break
 
-            # Round 2: Give more preferred days if room available
+            # Round 2: assign more preferred days if room
             for name, prefs in person_prefs.items():
                 for day in prefs:
                     date = day_mapping[day]
@@ -133,8 +135,8 @@ def run_allocation(database_url, only=None):
         conn.commit()
         cur.close()
         conn.close()
-        return True, []
 
+        return True, []
     except Exception as e:
         print(f"Allocation failed: {e}")
         return False, []
