@@ -240,7 +240,13 @@ st.info("""
 - 🗓️ **From Wednesday 09:00** you can submit your **project room preference** until **Thursday 16:00**. The allocations will be shared on **Thursday at 16:00**.
 - 🌿 **Oasis preferences** can be submitted **from Wednesday 09:00 until Friday 16:00**, and allocation will be done at **Friday 16:00**.
 - ✅ Allocations are refreshed **weekly** by an admin.
+
+---
+
+📌 **Strategy Project Rooms**:
+As the Strategy department, we are also using the Project Room tool for rooms **D02.09** (5 seats) and **D02.84–85–86** (each 4 seats).
 """)
+
 
 
 
