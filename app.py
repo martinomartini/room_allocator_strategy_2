@@ -7,6 +7,8 @@ from datetime import datetime
 import pytz
 import pandas as pd
 from allocate_rooms import run_allocation
+from datetime import datetime, timedelta
+
 
 # --- Configuration ---
 st.set_page_config(page_title="Weekly Room Allocator", layout="wide")
