@@ -27,7 +27,7 @@ ROOMS_FILE = os.path.join(BASE_DIR, 'rooms.json')
 with open(ROOMS_FILE, 'r') as f:
     AVAILABLE_ROOMS = json.load(f)
 
-oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 12})
+oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 15})
 
 @st.cache_resource
 def get_db_connection_pool():
