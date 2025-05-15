@@ -349,8 +349,7 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Get all people who ever signed up or are in the system
-    unique_names = sorted(set(df["Name"]).union({"Niek"}))
+    unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Ensure Niek is always there
     matrix = pd.DataFrame(False, index=unique_names, columns=day_names)
 
     for day, label in zip(days, day_names):
@@ -361,57 +360,54 @@ try:
             elif name in signed_up.values:
                 matrix.at[name, label] = True
 
-    # Add 'Available' row to show how many spots left
+    # Add visual availability row
     used_per_day = df.groupby("Date").size().to_dict()
-    available_row = {}
-    for day, label in zip(days, day_names):
-        used = used_per_day.get(day, 0)
-        available_row[label] = f"{max(0, capacity - used)} spots left"
-    matrix.loc["🪑 Available"] = available_row
+    availability = [f"{max(0, capacity - used_per_day.get(day, 0))} left" for day in days]
+    matrix.loc["🪑 Available"] = availability
 
-    # Disable editing on Niek and availability row
-    disabled_rows = ["🪑 Available"]
-    disabled_cells = {
-        (r, c): True
-        for r in matrix.index
-        for c in matrix.columns
-        if r in disabled_rows or (r != "Niek" and matrix.loc[r, c] == True and used_per_day.get(days[day_names.index(c)], 0) >= capacity)
-    }
-
-    # Show matrix with checkboxes
+    # Show editable matrix without availability row
+    editable_matrix = matrix.drop("🪑 Available")
     edited = st.data_editor(
-        matrix.drop("🪑 Available"),
-        disabled=disabled_cells,
+        editable_matrix,
+        disabled={"index": [name for name in editable_matrix.index if name == "Niek"]},
         use_container_width=True,
-        key="oasis_boolean_matrix"
+        key="oasis_matrix_editor"
     )
 
-    # Re-attach visual capacity row for clarity
-    full_view = pd.concat([edited, pd.DataFrame([available_row], index=["🪑 Available"])])
-
-    st.dataframe(full_view)
+    # Display final matrix with availability
+    full_display = pd.concat([edited, pd.DataFrame([availability], index=["🪑 Available"], columns=day_names)])
+    st.dataframe(full_display)
 
     if st.button("💾 Save Oasis Matrix"):
         with conn.cursor() as cur:
+            # Remove old records (except Niek)
             cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
             for name in edited.index:
-                selected_days = [label for label in day_names if edited.at[name, label]]
+                if name == "Niek" or name == "🪑 Available":
+                    continue
+                selected_days = [label for label in day_names if edited.at[name, label] is True]
                 if len(selected_days) > 2:
-                    st.warning(f"{name} selected more than 2 days – skipping.")
+                    st.warning(f"{name} selected more than 2 days — skipping.")
                     continue
                 for label in selected_days:
-                    date_obj = this_monday + timedelta(days=day_names.index(label))
+                    day_date = this_monday + timedelta(days=day_names.index(label))
+                    # Enforce capacity
+                    cur.execute(
+                        "SELECT COUNT(*) FROM weekly_allocations WHERE room_name = 'Oasis' AND date = %s",
+                        (day_date,)
+                    )
+                    current_count = cur.fetchone()[0]
+                    if current_count >= capacity:
+                        st.warning(f"{label} is already full — {name} not added on that day.")
+                        continue
                     cur.execute(
                         "INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)",
-                        (name, "Oasis", date_obj)
+                        (name, "Oasis", day_date)
                     )
             conn.commit()
-            st.success("✅ Matrix saved!")
+            st.success("✅ Matrix saved.")
 
 except Exception as e:
     st.error(f"❌ Error: {e}")
 finally:
     return_connection(pool, conn)
-
-
-
