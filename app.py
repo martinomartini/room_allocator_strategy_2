@@ -231,6 +231,48 @@ with st.expander("🔐 Admin Controls"):
             else:
                 st.error("❌ Project room allocation failed.")
 
+        # Manual project allocation edit
+        st.subheader("✏️ Manual Edit Project Room Allocations")
+        try:
+            conn_manual = get_connection(pool)
+            with conn_manual.cursor() as cur:
+                cur.execute("""
+                    SELECT team_name, room_name, date
+                    FROM weekly_allocations
+                    WHERE room_name != 'Oasis'
+                """)
+                rows = cur.fetchall()
+            manual_df = pd.DataFrame(rows, columns=["Team", "Room", "Date"])
+            manual_df["Date"] = pd.to_datetime(manual_df["Date"]).dt.date
+        finally:
+            return_connection(pool, conn_manual)
+
+        if not manual_df.empty:
+            edited_manual_df = st.data_editor(
+                manual_df,
+                use_container_width=True,
+                key="manual_room_edit"
+            )
+
+            if st.button("💾 Save Project Room Allocation Changes"):
+                try:
+                    conn_save = get_connection(pool)
+                    with conn_save.cursor() as cur:
+                        cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis'")
+                        for _, row in edited_manual_df.iterrows():
+                            cur.execute("""
+                                INSERT INTO weekly_allocations (team_name, room_name, date)
+                                VALUES (%s, %s, %s)
+                            """, (row["Team"], row["Room"], row["Date"]))
+                        conn_save.commit()
+                    st.success("✅ Manual project room allocations updated.")
+                except Exception as e:
+                    st.error(f"❌ Failed to update manual project allocations: {e}")
+                finally:
+                    return_connection(pool, conn_save)
+        else:
+            st.info("No project room allocations to edit yet.")
+
         # --- Oasis Allocation ---
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation"):
@@ -328,8 +370,9 @@ with st.expander("🔐 Admin Controls"):
                         cur.execute("DELETE FROM oasis_preferences")
                         for _, row in editable_oasis_df.iterrows():
                             cur.execute("""
-                                INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, preferred_day_3,
-                                                               preferred_day_4, preferred_day_5, submission_time)
+                                INSERT INTO oasis_preferences (
+                                    person_name, preferred_day_1, preferred_day_2,
+                                    preferred_day_3, preferred_day_4, preferred_day_5, submission_time)
                                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
                             """, (
                                 row["Person"],
@@ -347,7 +390,6 @@ with st.expander("🔐 Admin Controls"):
                     return_connection(pool, conn)
         else:
             st.info("No oasis preferences submitted yet.")
-
     elif pwd:
         st.error("❌ Incorrect password.")
 
