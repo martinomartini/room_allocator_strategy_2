@@ -228,6 +228,7 @@ with st.expander("🔐 Admin Controls"):
             else:
                 st.error("❌ Project room allocation failed.")
 
+        # --- Oasis Allocation ---
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation"):
             success, _ = run_allocation(DATABASE_URL, only="oasis")
@@ -236,15 +237,57 @@ with st.expander("🔐 Admin Controls"):
             else:
                 st.error("❌ Oasis allocation failed.")
 
-        # --- Reset Options ---
-        st.subheader("🧽 Reset Options")
-        if st.button("🗑️ Remove All Allocations"):
-            if reset_allocations(pool):
-                st.success("✅ All allocations removed.")
+        # --- Reset Project Room Data ---
+        st.subheader("🧹 Reset Project Room Data")
+        if st.button("🗑️ Remove Project Room Allocations"):
+            conn = get_connection(pool)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis'")
+                    conn.commit()
+                    st.success("✅ Project room allocations removed.")
+            except Exception as e:
+                st.error(f"❌ Failed to remove project room allocations: {e}")
+            finally:
+                return_connection(pool, conn)
 
-        if st.button("🧹 Remove All Preferences"):
-            if reset_preferences(pool):
-                st.success("✅ All preferences removed.")
+        if st.button("🧽 Remove Project Room Preferences"):
+            conn = get_connection(pool)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM weekly_preferences")
+                    conn.commit()
+                    st.success("✅ Project room preferences removed.")
+            except Exception as e:
+                st.error(f"❌ Failed to remove project preferences: {e}")
+            finally:
+                return_connection(pool, conn)
+
+        # --- Reset Oasis Data ---
+        st.subheader("🌾 Reset Oasis Data")
+        if st.button("🗑️ Remove Oasis Allocations"):
+            conn = get_connection(pool)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis'")
+                    conn.commit()
+                    st.success("✅ Oasis allocations removed.")
+            except Exception as e:
+                st.error(f"❌ Failed to remove oasis allocations: {e}")
+            finally:
+                return_connection(pool, conn)
+
+        if st.button("🧽 Remove Oasis Preferences"):
+            conn = get_connection(pool)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM oasis_preferences")
+                    conn.commit()
+                    st.success("✅ Oasis preferences removed.")
+            except Exception as e:
+                st.error(f"❌ Failed to remove oasis preferences: {e}")
+            finally:
+                return_connection(pool, conn)
 
         # --- Team Preferences Editing ---
         st.subheader("🧾 Team Preferences")
@@ -282,9 +325,17 @@ with st.expander("🔐 Admin Controls"):
                         cur.execute("DELETE FROM oasis_preferences")
                         for _, row in editable_oasis_df.iterrows():
                             cur.execute("""
-                                INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, submission_time)
-                                VALUES (%s, %s, %s, NOW())
-                            """, (row["Person"], row["Day 1"], row["Day 2"]))
+                                INSERT INTO oasis_preferences (person_name, preferred_day_1, preferred_day_2, preferred_day_3,
+                                                               preferred_day_4, preferred_day_5, submission_time)
+                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                            """, (
+                                row["Person"],
+                                row.get("preferred_day_1", None),
+                                row.get("preferred_day_2", None),
+                                row.get("preferred_day_3", None),
+                                row.get("preferred_day_4", None),
+                                row.get("preferred_day_5", None),
+                            ))
                         conn.commit()
                     st.success("✅ Oasis preferences updated.")
                 except Exception as e:
@@ -293,6 +344,7 @@ with st.expander("🔐 Admin Controls"):
                     return_connection(pool, conn)
         else:
             st.info("No oasis preferences submitted yet.")
+
     elif pwd:
         st.error("❌ Incorrect password.")
 
