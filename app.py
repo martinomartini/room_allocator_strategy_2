@@ -203,10 +203,11 @@ st.info("""
 💡 **How This Works:**
 
 - 🧑‍🤝‍🧑 Project teams can select **either Monday & Wednesday** or **Tuesday & Thursday**.
-- 🌿 Oasis users can choose **any 2 weekdays**, and will be randomly assigned.
+- 🌿 Oasis users can choose **up to 5 preferred weekdays**. Each person will be fairly assigned at least 1 preferred day if possible, and more if space allows.
 - ❗ You may only submit **once**. If you need to change your input, contact an admin.
 - ✅ Allocations are refreshed **weekly** by an admin. You can vote until allocation is run (typically Friday 17:00).
 """)
+
 
 
 now_local = datetime.now(OFFICE_TIMEZONE)
