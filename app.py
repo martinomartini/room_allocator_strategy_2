@@ -246,23 +246,20 @@ st.info("""
 
 ---
 
-### 🌿 Oasis: Two Ways to Join
+### 🌿 Oasis: How to Join
 
-1. **Reserve Oasis Seat**  
+1. **✅ Reserve Oasis Seat (recommended)**  
    ➤ Submit your **preferred days** (up to 5).  
-   ➤ Allocation happens fairly on **Friday at 16:00**.  
-   ➤ Your spot is **not guaranteed**, but everyone gets at least one preferred day if possible.
+   ➤ Allocation is done **automatically and fairly** at **Friday 16:00**.  
+   ➤ Everyone gets **at least one** of their preferred days, depending on availability.
 
-2. **Add Yourself to Oasis Allocation**  
-   ➤ Add yourself **manually** to specific days **right away**, if there's still availability.  
-   ➤ You’ll be instantly added to the schedule.  
+2. **⚠️ Add Yourself to Oasis Allocation (only if you forgot)**  
+   ➤ Use this **only if you missed the deadline** or forgot to submit your preferences.  
+   ➤ You will be added **immediately** to the selected days **if there’s space left**.  
+   ➤ This option does **not guarantee fairness** and bypasses the regular process.
 
-✨ Use "Reserve Oasis Seat" to get fair, automated allocation based on preferences.  
-
----
-
-📌 **Strategy Project Rooms**:
-As the Strategy department we have the rooms **D02.09** (5 seats) and **D02.84–85–86** (each 4 seats).
+ℹ️ Always use **"Reserve Oasis Seat"** before Friday 16:00 to ensure fair participation.  
+Only use **"Add Yourself"** if you forgot to register.
 """)
 
 
