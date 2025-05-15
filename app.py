@@ -155,6 +155,9 @@ def get_oasis_preferences(pool):
         return_connection(pool, conn)
 
 def insert_preference(pool, team, contact, size, days):
+    if size < 3:
+        st.error("❌ Team size must be at least 3.")
+        return False
     if size > 5:
         st.error("❌ Team size cannot exceed 5.")
         return False
@@ -240,6 +243,21 @@ st.info("""
 - 🗓️ **From Wednesday 09:00** you can submit your **project room preference** until **Thursday 16:00**. The allocations will be shared on **Thursday at 16:00**.
 - 🌿 **Oasis preferences** can be submitted **from Wednesday 09:00 until Friday 16:00**, and allocation will be done at **Friday 16:00**.
 - ✅ Allocations are refreshed **weekly** by an admin.
+
+---
+
+### 🌿 Oasis: Two Ways to Join
+
+1. **Reserve Oasis Seat**  
+   ➤ Submit your **preferred days** (up to 5).  
+   ➤ Allocation happens fairly on **Friday at 16:00**.  
+   ➤ Your spot is **not guaranteed**, but everyone gets at least one preferred day if possible.
+
+2. **Add Yourself to Oasis Allocation**  
+   ➤ Add yourself **manually** to specific days **right away**, if there's still availability.  
+   ➤ You’ll be instantly added to the schedule.  
+
+✨ Use "Reserve Oasis Seat" to get fair, automated allocation based on preferences.  
 
 ---
 
