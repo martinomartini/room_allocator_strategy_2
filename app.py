@@ -330,10 +330,16 @@ else:
     
 st.header("🆕 Add Yourself to Oasis Allocation")
 
+from datetime import datetime, timedelta
+
 with st.form("oasis_add_form"):
     new_name = st.text_input("Your Name")
     new_days = st.multiselect("Select up to 2 days:", ["Monday", "Tuesday", "Wednesday", "Thursday"])
     add_submit = st.form_submit_button("➕ Add me to the schedule")
+
+    # ✅ Define this_monday
+    today = datetime.today().date()
+    this_monday = today - timedelta(days=today.weekday())
 
     if add_submit:
         if not new_name.strip():
@@ -361,7 +367,7 @@ with st.form("oasis_add_form"):
                                 WHERE room_name = 'Oasis' AND date = %s
                             """, (date_obj,))
                             count = cur.fetchone()[0]
-                            if count >= capacity:
+                            if count >= oasis:
                                 st.warning(f"Oasis is full on {day}, not added.")
                             else:
                                 cur.execute("""
