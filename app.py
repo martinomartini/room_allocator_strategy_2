@@ -203,9 +203,11 @@ st.info("""
 💡 **How This Works:**
 
 - 🧑‍🤝‍🧑 Project teams can select **either Monday & Wednesday** or **Tuesday & Thursday**.
-- 🌿 Oasis users can choose **up to 5 preferred weekdays**. Each person will be fairly assigned at least 1 preferred day if possible, and more if space allows.
+- 🌿 Oasis users can choose **up to 5 preferred weekdays**, and will be randomly assigned—fairness is guaranteed. There are 16 places in the Oasis.
 - ❗ You may only submit **once**. If you need to change your input, contact an admin.
-- ✅ Allocations are refreshed **weekly** by an admin. You can vote until allocation is run (typically Friday 17:00).
+- 🗓️ **From Wednesday 09:00** you can submit your **project room preference** until **Thursday 16:00**. The allocations will be shared on **Thursday at 16:00**.
+- 🌿 **Oasis preferences** can be submitted **from Wednesday 09:00 until Friday 16:00**, and allocation will be done at **Friday 16:00**.
+- ✅ Allocations are refreshed **weekly** by an admin.
 """)
 
 
