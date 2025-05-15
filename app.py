@@ -317,22 +317,45 @@ st.header("Reserve Oasis Seat")
 with st.form("oasis_form"):
     person = st.text_input("Your Name")
     selected_days = st.multiselect(
-        "Select Your 2 Preferred Days for Oasis:",
+        "Select Your Preferred Days for Oasis:",
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        max_selections=2
+        max_selections=5
     )
     submit_oasis = st.form_submit_button("Submit Oasis Preference")
 
     if submit_oasis:
         if not person:
             st.error("❌ Please enter your name.")
-        elif len(selected_days) != 2:
-            st.error("❌ Select exactly 2 different days.")
+        elif len(selected_days) == 0:
+            st.error("❌ Select at least 1 preferred day.")
         else:
-            if insert_oasis(pool, person.strip(), selected_days[0], selected_days[1]):
-                st.success("✅ Oasis preference submitted!")
-
-
+            conn = get_connection(pool)
+            try:
+                with conn.cursor() as cur:
+                    # Prevent duplicate entry
+                    cur.execute("SELECT 1 FROM oasis_preferences WHERE person_name = %s", (person,))
+                    if cur.fetchone():
+                        st.error("❌ You've already submitted. Contact admin to change your selection.")
+                    else:
+                        # Pad to 5 days with NULLs if needed
+                        padded_days = selected_days + [None] * (5 - len(selected_days))
+                        cur.execute("""
+                            INSERT INTO oasis_preferences (
+                                person_name,
+                                preferred_day_1,
+                                preferred_day_2,
+                                preferred_day_3,
+                                preferred_day_4,
+                                preferred_day_5,
+                                submission_time
+                            ) VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                        """, (person.strip(), *padded_days))
+                        conn.commit()
+                        st.success("✅ Oasis preference submitted!")
+            except Exception as e:
+                st.error(f"❌ Failed to save preference: {e}")
+            finally:
+                return_connection(pool, conn)
 
 # --- Allocations ---
 st.header("📌 Project Room Allocations")
