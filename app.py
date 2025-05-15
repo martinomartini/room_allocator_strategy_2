@@ -219,19 +219,32 @@ with st.expander("🔐 Admin Controls"):
     if pwd == RESET_PASSWORD:
         st.success("✅ Access granted.")
 
-        if st.button("🚀 Run Allocation Now"):
+        st.subheader("🧠 Project Room Admin")
+        if st.button("🚀 Run Project Room Allocation"):
             if run_allocation(DATABASE_URL):
-                st.success("✅ Allocation completed.")
+                st.success("✅ Project room allocation completed.")
             else:
-                st.error("❌ Allocation failed.")
+                st.error("❌ Project room allocation failed.")
 
-        if st.button("🗑️ Reset Preferences"):
-            if reset_preferences(pool):
-                st.success("✅ Preferences cleared.")
+        st.subheader("🌿 Oasis Admin")
+        if st.button("🎲 Run Oasis Allocation"):
+            try:
+                from allocate_oasis import run_oasis_allocation  # Optional if separate file
+                if run_oasis_allocation(DATABASE_URL):
+                    st.success("✅ Oasis allocation completed.")
+                else:
+                    st.error("❌ Oasis allocation failed.")
+            except Exception as e:
+                st.error(f"❌ Oasis allocation error: {e}")
 
-        if st.button("🧼 Reset Allocations"):
+        st.subheader("🧽 Reset Options")
+        if st.button("🗑️ Remove All Allocations"):
             if reset_allocations(pool):
-                st.success("✅ Allocations cleared.")
+                st.success("✅ All allocations removed.")
+
+        if st.button("🧽 Remove All Preferences"):
+            if reset_preferences(pool):
+                st.success("✅ All preferences removed.")
 
         st.subheader("🧾 Team Preferences")
         df1 = get_preferences(pool)
@@ -278,9 +291,9 @@ with st.expander("🔐 Admin Controls"):
                     return_connection(pool, conn)
         else:
             st.info("No oasis preferences submitted yet.")
-
     elif pwd:
         st.error("❌ Incorrect password.")
+
 
 # --- Team Form ---
 st.header("Submit Team Preference")
