@@ -382,7 +382,7 @@ with st.form("oasis_add_form"):
             finally:
                 if conn:
                     return_connection(pool, conn)
-                    
+
 st.header("📊 Full Weekly Oasis Overview")
 
 from datetime import timedelta
@@ -403,26 +403,27 @@ try:
     df = pd.DataFrame(rows, columns=["Name", "Date"])
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
-    # Build matrix with ✅ or empty string
-    unique_names = sorted(set(df["Name"]).union({"Niek"}))  # Always include Niek
+    # Build matrix
+    unique_names = sorted(df["Name"].unique())
     matrix = pd.DataFrame("", index=unique_names, columns=day_names)
-
-    availability = []
 
     for day, label in zip(days, day_names):
         signed_up = df[df["Date"] == day]["Name"]
-        used = signed_up.nunique()
-        availability.append(f"**{label}**: {max(0, capacity - used)} spots left")
         for name in unique_names:
-            if name == "Niek" or name in signed_up.values:
+            if signed_up.tolist().count(name) > 0:
                 matrix.at[name, label] = "✅"
+            else:
+                matrix.at[name, label] = ""
 
-    # Show availability above table
-    st.markdown("### 🪑 Oasis Availability Summary")
+    # Initial availability summary
+    used_per_day = df.groupby("Date").size().to_dict()
+    availability = [f"**{label}**: {max(0, capacity - used_per_day.get(day, 0))} spots left" for day, label in zip(days, day_names)]
+
+    st.subheader("🪑 Oasis Availability Summary")
     st.markdown("<br>".join(availability), unsafe_allow_html=True)
 
+    # Editable table
     col_config = {day: st.column_config.TextColumn(label=day) for day in day_names}
-
     edited = st.data_editor(
         matrix,
         column_config=col_config,
@@ -435,8 +436,6 @@ try:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek'")
                 for name in edited.index:
-                    if name == "Niek":
-                        continue
                     selected_days = [label for label in day_names if edited.at[name, label] == "✅"]
                     for label in selected_days:
                         date_obj = this_monday + timedelta(days=day_names.index(label))
@@ -445,7 +444,22 @@ try:
                             (name, "Oasis", date_obj)
                         )
                 conn.commit()
-                st.success("✅ Matrix saved.")
+            st.success("✅ Matrix saved.")
+
+            # 🔄 Refresh and show updated availability
+            with conn.cursor() as cur:
+                cur.execute("SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis'")
+                rows = cur.fetchall()
+
+            df_updated = pd.DataFrame(rows, columns=["Name", "Date"])
+            df_updated["Date"] = pd.to_datetime(df_updated["Date"]).dt.date
+            st.subheader("🪑 Oasis Availability Summary (Updated)")
+            new_availability = []
+            for day, label in zip(days, day_names):
+                used = df_updated[df_updated["Date"] == day].Name.nunique()
+                new_availability.append(f"**{label}**: {max(0, capacity - used)} spots left")
+            st.markdown("<br>".join(new_availability), unsafe_allow_html=True)
+
         except Exception as e:
             st.error(f"❌ Failed to save matrix: {e}")
 
