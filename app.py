@@ -158,8 +158,8 @@ def insert_preference(pool, team, contact, size, days):
     if size < 3:
         st.error("❌ Team size must be at least 3.")
         return False
-    if size > 5:
-        st.error("❌ Team size cannot exceed 5.")
+    if size > 4:
+        st.error("❌ Team size cannot exceed 4.")
         return False
     conn = get_connection(pool)
     try:
@@ -448,7 +448,7 @@ with st.expander("🔐 Admin Controls"):
         st.error("❌ Incorrect password.")
 
 # --- Team Form ---
-st.header("Submit Team Preference")
+st.header("Request project room for teams of 3 or more - to be filled in by Engagement manager every Friday before 16:00")
 with st.form("team_form"):
     name = st.text_input("Team Name")
     contact = st.text_input("Contact Person")
@@ -464,7 +464,7 @@ with st.form("team_form"):
             st.success("✅ Submitted!")
 
 # --- Oasis Form ---
-st.header("Reserve Oasis Seat")
+st.header("Reserve Oasis Seat - Personally, if you are not allocated on a project  before Friday 16:00")
 with st.form("oasis_form"):
     person = st.text_input("Your Name")
     selected_days = st.multiselect(
@@ -521,7 +521,7 @@ from datetime import timedelta
 today = datetime.now(OFFICE_TIMEZONE).date()
 this_monday = today - timedelta(days=today.weekday())
 
-st.header("🆕 Add Yourself to Oasis Allocation")
+st.header("Add yourself to Oasis Allocation - Personally - Anytime, if there is availability")
 with st.form("oasis_add_form"):
     new_name = st.text_input("Your Name")
     new_days = st.multiselect("Select one or more days:", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
