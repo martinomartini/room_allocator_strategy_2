@@ -32,8 +32,13 @@ def run_allocation(database_url, only=None):
         conn = psycopg2.connect(database_url)
         cur = conn.cursor()
 
-        # Clear previous allocations
-        cur.execute("DELETE FROM weekly_allocations")
+        # --- Clear relevant previous allocations ---
+        if only == "project":
+            cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis'")
+        elif only == "oasis":
+            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis'")
+        else:
+            cur.execute("DELETE FROM weekly_allocations")
 
         # --- Project Room Allocation ---
         if only in [None, "project"]:
