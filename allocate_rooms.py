@@ -63,7 +63,10 @@ def run_allocation(database_url, only=None):
                 d2 = day_mapping[d2_label]
                 remaining = []
 
-                for team_name, team_size, _ in sorted(group, key=lambda x: -x[1]):
+                # Randomize order of team assignment
+                random.shuffle(group)
+
+                for team_name, team_size, _ in group:
                     available_d1 = [r for r in project_rooms if r["name"] not in used_rooms[d1] and r["capacity"] >= team_size]
                     available_d2 = [r for r in project_rooms if r["name"] not in used_rooms[d2] and r["capacity"] >= team_size]
 
