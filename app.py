@@ -458,7 +458,7 @@ with st.form("team_form"):
             st.success("✅ Submitted!")
 
 # --- Oasis Form ---
-st.header("Reserve Oasis Seat - Personally, if you are not allocated on a project  before Friday 16:00")
+st.header("Reserve Oasis Seat - Personally before Friday 16:00, if you are not allocated on a project of 3 or more")
 with st.form("oasis_form"):
     person = st.text_input("Your Name")
     selected_days = st.multiselect(
