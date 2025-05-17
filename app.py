@@ -442,7 +442,7 @@ with st.expander("🔐 Admin Controls"):
         st.error("❌ Incorrect password.")
 
 # --- Team Form ---
-st.header("Request project room for teams of 3 or more - to be filled in by Engagement manager every wednesday from 09:00 until thursday 16:00")
+st.header("Request project room for teams of 3 or more - to be filled in by Engagement manager every Wednesday from 09:00 until Thursday 16:00")
 with st.form("team_form"):
     name = st.text_input("Team Name")
     contact = st.text_input("Contact Person")
