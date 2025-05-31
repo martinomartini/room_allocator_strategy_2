@@ -8,14 +8,34 @@ import pytz
 import pandas as pd
 from psycopg2.extras import RealDictCursor
 
-# Placeholder for run_allocation.
-# This function will be called with the 'allocated_week_monday'
-# determined by the admin's display settings when the "Run..." buttons are pressed.
+# MODIFIED Placeholder for run_allocation.
 def run_allocation(db_url, allocated_week_monday: date, only=None):
     st.warning(f"Placeholder: run_allocation CALLED for {only} for week {allocated_week_monday.strftime('%Y-%m-%d')}.")
-    # In a real scenario, this function would query preferences and write allocations
-    # for the 'allocated_week_monday'.
-    return True, f"Placeholder: Simulated successful allocation for {allocated_week_monday.strftime('%Y-%m-%d')}"
+    
+    if only == "project":
+        try:
+            with open(ROOMS_FILE, 'r') as f:
+                all_project_rooms = [r["name"] for r in json.load(f) if r["name"] != "Oasis"]
+            if all_project_rooms:
+                dummy_room = all_project_rooms[0]
+                dummy_team = "Test Team Alpha"
+                dummy_date = allocated_week_monday # Monday of the target week
+                
+                st.session_state.dummy_allocations = [
+                    alloc for alloc in st.session_state.dummy_allocations
+                    if not (alloc['room_name'] == dummy_room and alloc['date'] == dummy_date)
+                ]
+                st.session_state.dummy_allocations.append({
+                    "team_name": dummy_team,
+                    "room_name": dummy_room,
+                    "date": dummy_date,
+                    "contact_person": "Test User" 
+                })
+                st.info(f"Placeholder: Added DUMMY allocation: {dummy_team} in {dummy_room} on {dummy_date.strftime('%Y-%m-%d')} to st.session_state.dummy_allocations")
+        except Exception as e:
+            st.error(f"Placeholder: Error creating dummy allocation: {e}")
+            
+    return True, f"Placeholder: Simulated successful allocation for {allocated_week_monday.strftime('%Y-%m-%d')} (with dummy data for projects)"
 
 
 # -----------------------------------------------------
@@ -57,7 +77,6 @@ def get_db_connection_pool():
         st.error(f"Failed to connect to database: {e}")
         return None
 
-
 def get_connection(pool):
     if pool: return pool.getconn()
     return None
@@ -91,12 +110,14 @@ if initial_oasis_date_str:
         parsed_oasis_date = None
 
 now_in_tz_init = datetime.now(OFFICE_TIMEZONE)
-# This is the actual current week's Monday, used as a fallback if no date is in URL/session
 current_week_monday_init = now_in_tz_init.date() - timedelta(days=now_in_tz_init.date().weekday())
 
-# Initialize display dates: URL -> Session State -> Actual Current Week
 st.session_state.project_rooms_display_monday = parsed_proj_date or st.session_state.get("project_rooms_display_monday", current_week_monday_init)
 st.session_state.oasis_display_monday = parsed_oasis_date or st.session_state.get("oasis_display_monday", current_week_monday_init)
+
+# Initialize dummy_allocations
+if "dummy_allocations" not in st.session_state:
+    st.session_state.dummy_allocations = []
 
 
 default_submission_week_of_text = st.session_state.project_rooms_display_monday.strftime("%-d %B")
@@ -122,12 +143,15 @@ if "oasis_allocations_display_markdown_content" not in st.session_state or parse
 # -----------------------------------------------------
 # Database Utility Functions
 # -----------------------------------------------------
+# MODIFIED get_room_grid to read from st.session_state.dummy_allocations
 def get_room_grid(pool, display_monday: date):
-    if not pool: return pd.DataFrame()
+    if not pool: return pd.DataFrame() # Should ideally still work with dummy data if pool is None
     this_monday = display_monday
     day_mapping = {
-        this_monday + timedelta(days=0): "Monday", this_monday + timedelta(days=1): "Tuesday",
-        this_monday + timedelta(days=2): "Wednesday", this_monday + timedelta(days=3): "Thursday"
+        this_monday + timedelta(days=0): "Monday", 
+        this_monday + timedelta(days=1): "Tuesday",
+        this_monday + timedelta(days=2): "Wednesday", 
+        this_monday + timedelta(days=3): "Thursday"
     }
     day_labels = list(day_mapping.values())
     expected_columns = ["Room"] + day_labels 
@@ -143,37 +167,67 @@ def get_room_grid(pool, display_monday: date):
     if not all_rooms: 
         return pd.DataFrame(columns=expected_columns)
 
+    db_allocations = []
+    contacts_map = {}
     conn = get_connection(pool)
-    if not conn: 
-        if grid:
-            return pd.DataFrame(list(grid.values()))
-        else: 
-            return pd.DataFrame(columns=expected_columns)
-            
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            start_date, end_date = this_monday, this_monday + timedelta(days=3)
-            cur.execute("""
-                SELECT team_name, room_name, date FROM weekly_allocations
-                WHERE room_name != 'Oasis' AND date >= %s AND date <= %s
-            """, (start_date, end_date))
-            allocations = cur.fetchall()
-            cur.execute("SELECT team_name, contact_person FROM weekly_preferences")
-            contacts = {row["team_name"]: row["contact_person"] for row in cur.fetchall()}
-        for row in allocations:
-            team, room, date_val = row["team_name"], row["room_name"], row["date"]
-            day = day_mapping.get(date_val)
-            if room not in grid or not day: continue
-            contact = contacts.get(team)
-            grid[room][day] = f"{team} ({contact})" if contact else team
-        return pd.DataFrame(list(grid.values()))
-    except psycopg2.Error as e:
-        st.warning(f"Database error while getting room grid: {e}")
-        if grid:
-            return pd.DataFrame(list(grid.values()))
-        else:
-            return pd.DataFrame(columns=expected_columns)
-    finally: return_connection(pool, conn)
+    if conn:
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                start_date, end_date = this_monday, this_monday + timedelta(days=3)
+                cur.execute("""
+                    SELECT team_name, room_name, date FROM weekly_allocations
+                    WHERE room_name != 'Oasis' AND date >= %s AND date <= %s
+                """, (start_date, end_date))
+                db_allocations_raw = cur.fetchall()
+                
+                cur.execute("SELECT team_name, contact_person FROM weekly_preferences")
+                contacts_map = {row["team_name"]: row["contact_person"] for row in cur.fetchall()}
+
+                # Add contact person to db_allocations_raw
+                db_allocations = []
+                for alloc_raw in db_allocations_raw:
+                    db_allocations.append({
+                        **alloc_raw,
+                        'contact_person': contacts_map.get(alloc_raw['team_name'])
+                    })
+        except psycopg2.Error as e:
+            st.warning(f"Database error while getting room grid: {e}")
+        finally: 
+            return_connection(pool, conn)
+    
+    week_start_dummy = display_monday
+    week_end_dummy = display_monday + timedelta(days=3) # Mon-Thurs for project rooms
+    
+    relevant_dummy_allocations = [
+        da for da in st.session_state.get("dummy_allocations", [])
+        if da['room_name'] != "Oasis" and week_start_dummy <= da['date'] <= week_end_dummy
+    ]
+    
+    # Process DB allocations first
+    for row in db_allocations:
+        team, room, date_val = row["team_name"], row["room_name"], row["date"]
+        contact = row.get("contact_person") 
+        day_of_week_str = day_mapping.get(date_val)
+        
+        if room in grid and day_of_week_str:
+            grid[room][day_of_week_str] = f"{team} ({contact})" if contact else team
+    
+    # Then overlay dummy allocations (they will overwrite if they target the same slot)
+    for row in relevant_dummy_allocations:
+        team, room, date_val = row["team_name"], row["room_name"], row["date"]
+        contact = row.get("contact_person")
+        day_of_week_str = day_mapping.get(date_val)
+
+        if room in grid and day_of_week_str:
+            grid[room][day_of_week_str] = f"{team} ({contact})" if contact else team
+            st.write(f"Debug get_room_grid: Applied dummy for {team} in {room} on {day_of_week_str}")
+
+
+    if not grid: # Should only happen if all_rooms was empty
+        return pd.DataFrame(columns=expected_columns)
+        
+    return pd.DataFrame(list(grid.values()))
+
 
 def get_preferences(pool):
     if not pool: return pd.DataFrame()
@@ -344,7 +398,6 @@ with st.expander("🔐 Admin Controls"):
             st.success("All configurable texts updated!")
             st.rerun()
 
-
         st.subheader("🗓️ Set Display Dates (Persists in URL)")
         admin_selected_project_display_date = st.date_input(
             "Set Project Rooms Display Week Starting Monday:",
@@ -367,7 +420,7 @@ with st.expander("🔐 Admin Controls"):
             st.session_state.oasis_display_monday = final_oasis_monday
             st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {final_project_monday.strftime('%-d %B %Y')}."
             st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {final_oasis_monday.strftime('%-d %B %Y')}."
-            st.session_state["submission_week_of_text"] = final_project_monday.strftime("%-d %B") # Assuming submission text follows project display
+            st.session_state["submission_week_of_text"] = final_project_monday.strftime("%-d %B") 
             
             st.query_params = {
                 "proj_date": final_project_monday.strftime("%Y-%m-%d"),
@@ -376,25 +429,26 @@ with st.expander("🔐 Admin Controls"):
             st.success(f"Display weeks set in URL. Project rooms: {final_project_monday.strftime('%Y-%m-%d')}, Oasis: {final_oasis_monday.strftime('%Y-%m-%d')}. Page will now refresh.")
             st.rerun()
 
+        # MODIFIED "Run Project Room Allocation" button logic
         st.subheader("🧠 Project Room Admin")
-        if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc_v2"): # Changed key for clarity
+        if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc_dummy_test"): 
             if 'run_allocation' in globals() and callable(run_allocation):
-                # USE THE DISPLAYED WEEK for allocation action
                 action_week_monday = st.session_state.project_rooms_display_monday
                 
                 if not isinstance(action_week_monday, date):
                     st.error("Error: Project rooms display date is not a valid date. Cannot run allocation.")
                 else:
+                    st.write(f"Debug: Calling run_allocation for PROJECT for week: {action_week_monday}") 
                     success, message = run_allocation(DATABASE_URL, allocated_week_monday=action_week_monday, only="project")
+                    st.write(f"Debug: run_allocation for PROJECT returned: success={success}, message='{message}'") 
 
                     if success:
-                        # Update texts to reflect the processed week (which is the displayed week)
                         st.session_state["submission_week_of_text"] = action_week_monday.strftime("%-d %B")
                         st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {action_week_monday.strftime('%-d %B %Y')}."
-                        # Ensure URL is also consistent with this processed/displayed week
                         st.query_params["proj_date"] = action_week_monday.strftime("%Y-%m-%d")
                         
-                        st.success(f"✅ Project room allocation completed for week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
+                        st.success(f"✅ Project room allocation (with dummy data) completed for week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
+                        st.write("Debug: About to rerun after project allocation success.") 
                         st.rerun()
                     else:
                         st.error(f"❌ Project room allocation failed for week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
@@ -402,20 +456,18 @@ with st.expander("🔐 Admin Controls"):
                 st.error("run_allocation function not available.")
 
         st.subheader("🌿 Oasis Admin")
-        if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc_v2"): # Changed key for clarity
+        if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc_v2"): # Assuming similar logic desired for Oasis
             if 'run_allocation' in globals() and callable(run_allocation):
-                # USE THE DISPLAYED WEEK for allocation action
                 action_week_monday = st.session_state.oasis_display_monday
 
                 if not isinstance(action_week_monday, date):
                      st.error("Error: Oasis display date is not a valid date. Cannot run allocation.")
                 else:
+                    # If you want dummy data for Oasis too, modify run_allocation and get_oasis_grid (or equivalent)
                     success, message = run_allocation(DATABASE_URL, allocated_week_monday=action_week_monday, only="oasis")
 
                     if success:
-                        # Update texts to reflect the processed week
                         st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {action_week_monday.strftime('%-d %B %Y')}."
-                        # Ensure URL is also consistent
                         st.query_params["oasis_date"] = action_week_monday.strftime("%Y-%m-%d")
 
                         st.success(f"✅ Oasis allocation completed for week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
@@ -428,13 +480,20 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
             current_proj_display_mon = st.session_state.project_rooms_display_monday
-            if not isinstance(current_proj_display_mon, date): # Ensure it's a date object
+            if not isinstance(current_proj_display_mon, date): 
                  st.error("Project display date is not set correctly for editing.")
             else:
-                alloc_df_admin = get_room_grid(pool, current_proj_display_mon)
+                alloc_df_admin = get_room_grid(pool, current_proj_display_mon) # This will now include dummy data
                 if not alloc_df_admin.empty:
                     editable_alloc_proj = st.data_editor(alloc_df_admin, num_rows="dynamic", use_container_width=True, key="edit_proj_allocations_data")
                     if st.button("💾 Save Project Room Allocation Changes", key="btn_save_proj_alloc_changes"):
+                        # This save logic would typically clear dummy data and save only actual DB data
+                        # For this test, it will save the dummy data as if it were real if not handled.
+                        # For now, we'll assume it saves what's in editable_alloc_proj.
+                        # A real implementation would need to distinguish.
+                        st.session_state.dummy_allocations = [] # Clear dummy data after saving to DB
+                        st.info("Dummy data cleared. Saving to DB (simulated by this message if placeholder still active).")
+
                         conn_admin_alloc = get_connection(pool)
                         if not conn_admin_alloc: st.error("No DB connection")
                         else:
@@ -452,7 +511,7 @@ with st.expander("🔐 Admin Controls"):
                                             value = row.get(day_name, "")
                                             if value and value != "Vacant":
                                                 team_info = str(value).split("(")[0].strip()
-                                                alloc_date_val = current_proj_display_mon + timedelta(days=day_idx) # Renamed to avoid conflict
+                                                alloc_date_val = current_proj_display_mon + timedelta(days=day_idx) 
                                                 if team_info:
                                                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (team_info, room_name_val, alloc_date_val))
                                 conn_admin_alloc.commit()
@@ -463,7 +522,7 @@ with st.expander("🔐 Admin Controls"):
                                 if conn_admin_alloc: conn_admin_alloc.rollback()
                             finally: return_connection(pool, conn_admin_alloc)
                 else:
-                    st.info(f"No project room allocations for week of {current_proj_display_mon.strftime('%Y-%m-%d')} to edit, or data is empty.")
+                    st.info(f"No project room allocations for week of {current_proj_display_mon.strftime('%Y-%m-%d')} to edit, or data is empty (after considering dummy data).")
         except Exception as e:
             st.warning(f"Failed to load project room allocation data for admin edit: {e}")
 
@@ -473,6 +532,14 @@ with st.expander("🔐 Admin Controls"):
             if not isinstance(st.session_state.project_rooms_display_monday, date):
                 st.error("Project display date not set correctly for reset.")
             else:
+                # Also clear dummy allocations for this week
+                week_to_clear = st.session_state.project_rooms_display_monday
+                st.session_state.dummy_allocations = [
+                    da for da in st.session_state.dummy_allocations 
+                    if not (week_to_clear <= da['date'] < week_to_clear + timedelta(days=4) and da['room_name'] != 'Oasis')
+                ]
+                st.info(f"Dummy project allocations cleared for week of {week_to_clear.strftime('%Y-%m-%d')}")
+
                 conn_reset_pra = get_connection(pool)
                 if conn_reset_pra:
                     try:
@@ -480,10 +547,13 @@ with st.expander("🔐 Admin Controls"):
                             mon_to_reset = st.session_state.project_rooms_display_monday
                             cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=3)))
                             conn_reset_pra.commit()
-                            st.success(f"✅ Project room allocations (non-Oasis) removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
+                            st.success(f"✅ DB Project room allocations (non-Oasis) removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
                             st.rerun()
                     except Exception as e: st.error(f"❌ Failed to reset project allocations: {e}"); conn_reset_pra.rollback()
                     finally: return_connection(pool, conn_reset_pra)
+                else: # If no DB, still rerun to show cleared dummy data
+                    st.rerun()
+
 
         if st.button("🧽 Remove All Project Room Preferences (Global Action)", key="btn_reset_all_proj_prefs_confirmable"):
             st.session_state.confirm_prp_reset = True
@@ -515,6 +585,8 @@ with st.expander("🔐 Admin Controls"):
             if not isinstance(st.session_state.oasis_display_monday, date):
                  st.error("Oasis display date not set correctly for reset.")
             else:
+                # Also clear dummy allocations for this week if you implement that for Oasis
+                st.info(f"DB Oasis allocations cleared for week of {st.session_state.oasis_display_monday.strftime('%Y-%m-%d')}")
                 conn_reset_oa = get_connection(pool)
                 if conn_reset_oa:
                     try:
@@ -522,10 +594,13 @@ with st.expander("🔐 Admin Controls"):
                             mon_to_reset = st.session_state.oasis_display_monday
                             cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=4)))
                             conn_reset_oa.commit()
-                            st.success(f"✅ Oasis allocations removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
+                            st.success(f"✅ DB Oasis allocations removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
                             st.rerun()
                     except Exception as e: st.error(f"❌ Failed to reset Oasis allocations: {e}"); conn_reset_oa.rollback()
                     finally: return_connection(pool, conn_reset_oa)
+                else:
+                    st.rerun()
+
         
         if st.button("🧽 Remove All Oasis Preferences (Global Action)", key="btn_reset_all_oasis_prefs_confirmable"):
             st.session_state.confirm_op_reset = True
@@ -654,7 +729,7 @@ st.header("📌 Project Room Allocations")
 st.markdown(st.session_state.get('project_allocations_display_markdown_content', default_project_alloc_markdown))
 
 if isinstance(st.session_state.project_rooms_display_monday, date):
-    alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday)
+    alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday) # Will show dummy data
     if alloc_display_df.empty:
         st.write(f"No project room allocations yet for the week of {st.session_state.project_rooms_display_monday.strftime('%d %B %Y')}.")
     else:
@@ -775,7 +850,7 @@ if isinstance(oasis_overview_monday_display, date):
                 if not df_matrix_data.empty: 
                     for _, row_data in df_matrix_data.iterrows():
                         person_name = row_data["team_name"]
-                        alloc_date_val = row_data["date"] # Renamed to avoid conflict
+                        alloc_date_val = row_data["date"] 
                         if alloc_date_val in oasis_overview_days_dates and person_name in initial_matrix_df.index:
                             initial_matrix_df.at[person_name, alloc_date_val.strftime("%A")] = True
                 
@@ -823,7 +898,7 @@ if isinstance(oasis_overview_monday_display, date):
                                 for day_idx, day_col_name in enumerate(oasis_overview_day_names):
                                     if edited_matrix.at[person_name_matrix, day_col_name]: 
                                         if occupied_counts_per_day[day_col_name] < oasis_capacity:
-                                            alloc_date_val_matrix = oasis_overview_monday_display + timedelta(days=day_idx) # Renamed
+                                            alloc_date_val_matrix = oasis_overview_monday_display + timedelta(days=day_idx) 
                                             cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name_matrix, "Oasis", alloc_date_val_matrix))
                                             occupied_counts_per_day[day_col_name] += 1
                                         else:
@@ -844,7 +919,6 @@ if isinstance(oasis_overview_monday_display, date):
         finally: return_connection(pool, conn_matrix)
 else:
     st.error("Error: Oasis display date is not configured correctly.")
-
 
 # -----------------------------------------------------
 # Final Note: DB connectivity check
