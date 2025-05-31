@@ -61,33 +61,96 @@ def return_connection(pool, conn):
 pool = get_db_connection_pool()
 
 # -----------------------------------------------------
-# Initialize session state ONLY ONCE with default values
+# Admin Settings Functions - Store in Database
 # -----------------------------------------------------
+def create_admin_settings_table(pool):
+    """Create admin_settings table if it doesn't exist"""
+    if not pool: return
+    conn = get_connection(pool)
+    if not conn: return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_settings (
+                    id SERIAL PRIMARY KEY,
+                    setting_key VARCHAR(255) UNIQUE NOT NULL,
+                    setting_value TEXT,
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            conn.commit()
+    except Exception as e:
+        st.error(f"Error creating admin_settings table: {e}")
+        if conn: conn.rollback()
+    finally:
+        return_connection(pool, conn)
 
-# Initialize database date values (these stay fixed unless manually changed in admin)
+def get_admin_setting(pool, key, default_value=""):
+    """Get an admin setting from database"""
+    if not pool: return default_value
+    conn = get_connection(pool)
+    if not conn: return default_value
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT setting_value FROM admin_settings WHERE setting_key = %s", (key,))
+            result = cur.fetchone()
+            return result[0] if result else default_value
+    except Exception as e:
+        st.warning(f"Error getting admin setting {key}: {e}")
+        return default_value
+    finally:
+        return_connection(pool, conn)
+
+def set_admin_setting(pool, key, value):
+    """Set an admin setting in database"""
+    if not pool: return False
+    conn = get_connection(pool)
+    if not conn: return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO admin_settings (setting_key, setting_value, updated_at) 
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (setting_key) 
+                DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = NOW()
+            """, (key, value))
+            conn.commit()
+            return True
+    except Exception as e:
+        st.error(f"Error setting admin setting {key}: {e}")
+        if conn: conn.rollback()
+        return False
+    finally:
+        return_connection(pool, conn)
+
+# Initialize admin settings table
+create_admin_settings_table(pool)
+
+# -----------------------------------------------------
+# Load Admin Settings from Database
+# -----------------------------------------------------
+@st.cache_data(ttl=60)  # Cache for 60 seconds to avoid too many DB calls
+def load_admin_settings():
+    """Load all admin settings from database with caching"""
+    return {
+        'submission_week_of_text': get_admin_setting(pool, 'submission_week_of_text', '3 June'),
+        'submission_start_text': get_admin_setting(pool, 'submission_start_text', 'Wednesday 5 June 09:00'),
+        'submission_end_text': get_admin_setting(pool, 'submission_end_text', 'Thursday 6 June 16:00'),
+        'oasis_end_text': get_admin_setting(pool, 'oasis_end_text', 'Friday 7 June 16:00'),
+        'project_allocations_display_markdown_content': get_admin_setting(pool, 'project_allocations_display_markdown_content', 'Displaying project rooms for the week of 27 May 2024.'),
+        'oasis_allocations_display_markdown_content': get_admin_setting(pool, 'oasis_allocations_display_markdown_content', 'Displaying Oasis for the week of 27 May 2024.')
+    }
+
+# Load settings
+admin_settings = load_admin_settings()
+
+# -----------------------------------------------------
+# Initialize session state with database values
+# -----------------------------------------------------
 if "project_rooms_display_monday" not in st.session_state:
     st.session_state.project_rooms_display_monday = STATIC_PROJECT_MONDAY
 if "oasis_display_monday" not in st.session_state:
     st.session_state.oasis_display_monday = STATIC_OASIS_MONDAY
-
-# Initialize EDITABLE TEXT VALUES - these can be changed in admin section
-if "submission_week_of_text" not in st.session_state: 
-    st.session_state["submission_week_of_text"] = "3 June"
-
-if "submission_start_text" not in st.session_state:
-    st.session_state["submission_start_text"] = "Wednesday 5 June 09:00"
-if "submission_end_text" not in st.session_state:
-    st.session_state["submission_end_text"] = "Thursday 6 June 16:00"
-if "oasis_end_text" not in st.session_state:
-    st.session_state["oasis_end_text"] = "Friday 7 June 16:00"
-
-# Initialize EDITABLE HEADER TEXT - these can be changed in admin section
-if "project_allocations_display_markdown_content" not in st.session_state:
-    st.session_state["project_allocations_display_markdown_content"] = "Displaying project rooms for the week of 27 May 2024."
-
-if "oasis_allocations_display_markdown_content" not in st.session_state:
-    st.session_state["oasis_allocations_display_markdown_content"] = "Displaying Oasis for the week of 27 May 2024."
-
 
 # -----------------------------------------------------
 # Database Utility Functions
@@ -272,52 +335,70 @@ with st.expander("🔐 Admin Controls"):
     if pwd == RESET_PASSWORD:
         st.success("✅ Access granted.")
 
-        st.subheader("💼 Update All Display Texts")
-        st.markdown("**Note:** These texts are purely for display and will persist after refresh.")
+        st.subheader("💼 Update All Display Texts (Stored in Database)")
+        st.markdown("**Note:** These texts are stored in database and will persist permanently across all refreshes and sessions.")
+        
+        # Refresh admin settings to get latest values
+        if st.button("🔄 Refresh Settings from Database", key="refresh_settings"):
+            st.cache_data.clear()
+            admin_settings = load_admin_settings()
+            st.success("Settings refreshed from database!")
         
         new_submission_week_of_text = st.text_input(
             "Text for 'Submissions for the week of ...' (e.g., '9 June')", 
-            st.session_state["submission_week_of_text"],
+            admin_settings['submission_week_of_text'],
             key="conf_sub_week_text"
         )
         new_sub_start_text = st.text_input(
             "Display text for 'Submission start'", 
-            st.session_state["submission_start_text"],
+            admin_settings['submission_start_text'],
             key="conf_sub_start_text"
         )
         new_sub_end_text = st.text_input(
             "Display text for 'Submission end'", 
-            st.session_state["submission_end_text"],
+            admin_settings['submission_end_text'],
             key="conf_sub_end_text"
         )
         new_oasis_end_text = st.text_input(
             "Display text for 'Oasis end'", 
-            st.session_state["oasis_end_text"],
+            admin_settings['oasis_end_text'],
             key="conf_oasis_end_text"
         )
         
         new_project_alloc_display_markdown = st.text_area(
             "Header text for 'Project Room Allocations' section", 
-            st.session_state["project_allocations_display_markdown_content"],
+            admin_settings['project_allocations_display_markdown_content'],
             key="conf_proj_alloc_header",
             height=100
         )
         new_oasis_alloc_display_markdown = st.text_area(
             "Header text for 'Oasis Allocations' section", 
-            st.session_state["oasis_allocations_display_markdown_content"],
+            admin_settings['oasis_allocations_display_markdown_content'],
             key="conf_oasis_alloc_header",
             height=100
         )
         
-        if st.button("💾 Update All Display Texts", key="btn_update_conf_texts"):
-            st.session_state["submission_week_of_text"] = new_submission_week_of_text
-            st.session_state["submission_start_text"] = new_sub_start_text
-            st.session_state["submission_end_text"] = new_sub_end_text
-            st.session_state["oasis_end_text"] = new_oasis_end_text
-            st.session_state["project_allocations_display_markdown_content"] = new_project_alloc_display_markdown
-            st.session_state["oasis_allocations_display_markdown_content"] = new_oasis_alloc_display_markdown
-            st.success("✅ All display texts updated and will persist after refresh!")
-            st.rerun()
+        if st.button("💾 Save All Display Texts to Database", key="btn_update_conf_texts"):
+            success_count = 0
+            if set_admin_setting(pool, 'submission_week_of_text', new_submission_week_of_text):
+                success_count += 1
+            if set_admin_setting(pool, 'submission_start_text', new_sub_start_text):
+                success_count += 1
+            if set_admin_setting(pool, 'submission_end_text', new_sub_end_text):
+                success_count += 1
+            if set_admin_setting(pool, 'oasis_end_text', new_oasis_end_text):
+                success_count += 1
+            if set_admin_setting(pool, 'project_allocations_display_markdown_content', new_project_alloc_display_markdown):
+                success_count += 1
+            if set_admin_setting(pool, 'oasis_allocations_display_markdown_content', new_oasis_alloc_display_markdown):
+                success_count += 1
+            
+            if success_count == 6:
+                st.success("✅ All display texts saved to database and will persist permanently!")
+                st.cache_data.clear()  # Clear cache to reload new values
+                st.rerun()
+            else:
+                st.error(f"❌ Only {success_count}/6 settings saved successfully.")
 
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
@@ -491,8 +572,8 @@ with st.expander("🔐 Admin Controls"):
 st.header("📝 Request Project Room")
 st.markdown(
     f"""
-    For teams of 3 or more. Submissions for the **week of {st.session_state["submission_week_of_text"]}** are open 
-    from **{st.session_state["submission_start_text"]}** until **{st.session_state["submission_end_text"]}**.
+    For teams of 3 or more. Submissions for the **week of {admin_settings['submission_week_of_text']}** are open 
+    from **{admin_settings['submission_start_text']}** until **{admin_settings['submission_end_text']}**.
     """
 )
 with st.form("team_form_main"):
@@ -517,8 +598,8 @@ with st.form("team_form_main"):
 st.header("🌿 Reserve Oasis Seat")
 st.markdown(
     f"""
-    Submit your personal preferences for the **week of {st.session_state["submission_week_of_text"]}**. 
-    Submissions open from **{st.session_state["submission_start_text"]}** until **{st.session_state["oasis_end_text"]}**.
+    Submit your personal preferences for the **week of {admin_settings['submission_week_of_text']}**. 
+    Submissions open from **{admin_settings['submission_start_text']}** until **{admin_settings['oasis_end_text']}**.
     """
 )
 with st.form("oasis_form_main"):
@@ -540,7 +621,7 @@ with st.form("oasis_form_main"):
 # Display: Project Room Allocations
 # -----------------------------------------------------
 st.header("📌 Project Room Allocations")
-st.markdown(st.session_state['project_allocations_display_markdown_content']) 
+st.markdown(admin_settings['project_allocations_display_markdown_content']) 
 alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday) 
 if alloc_display_df.empty:
     st.write(f"No project room allocations yet.")
@@ -603,7 +684,7 @@ with st.form("oasis_add_form_main"):
 # Full Weekly Oasis Overview
 # -----------------------------------------------------
 st.header("📊 Full Weekly Oasis Overview")
-st.markdown(st.session_state['oasis_allocations_display_markdown_content']) 
+st.markdown(admin_settings['oasis_allocations_display_markdown_content']) 
 oasis_overview_monday_display = st.session_state.oasis_display_monday 
 oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
 oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
