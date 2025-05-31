@@ -324,11 +324,10 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
             if run_allocation:
-                # Use the static monday instead of calculating it
-                success, _ = run_allocation(DATABASE_URL, only="project") 
+                # Pass the static Monday date to the allocation function
+                success, _ = run_allocation(DATABASE_URL, only="project", base_monday_date=st.session_state.project_rooms_display_monday) 
 
                 if success:
-                    # Don't update the display monday automatically - keep it static
                     st.success(f"✅ Project room allocation completed for week of {st.session_state.project_rooms_display_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
                 else:
@@ -339,11 +338,10 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
             if run_allocation:
-                # Use the static monday instead of calculating it
-                success, _ = run_allocation(DATABASE_URL, only="oasis") 
+                # Pass the static Monday date to the allocation function
+                success, _ = run_allocation(DATABASE_URL, only="oasis", base_monday_date=st.session_state.oasis_display_monday) 
 
                 if success:
-                    # Don't update the display monday automatically - keep it static
                     st.success(f"✅ Oasis allocation completed for week of {st.session_state.oasis_display_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
                 else:
@@ -664,7 +662,6 @@ else:
         for day_dt, day_str_label in zip(oasis_overview_days_dates, oasis_overview_day_names):
             used_spots = current_day_alloc_counts[day_dt]
             spots_left = max(0, oasis_capacity - used_spots)
-            # THIS IS THE CHANGED LINE:
             st.markdown(f"**{day_str_label}**: {spots_left} spot(s) left")
 
         edited_matrix = st.data_editor(
