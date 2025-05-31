@@ -37,17 +37,9 @@ oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 
 # -----------------------------------------------------
 # STATIC DATE CONFIGURATION - EDIT THESE VALUES MANUALLY
 # -----------------------------------------------------
-# These are the actual date objects used for database operations
+# These are the actual date objects used for database operations (you can change these if needed)
 STATIC_PROJECT_MONDAY = date(2024, 5, 27)  # Monday of the week you want to display for project rooms
 STATIC_OASIS_MONDAY = date(2024, 5, 27)    # Monday of the week you want to display for Oasis
-
-# These are PURE TEXT STRINGS for display only - no date calculations!
-STATIC_SUBMISSION_WEEK_TEXT = "3 June"     # Text for "week of" display
-STATIC_SUBMISSION_START_TEXT = "Wednesday 5 June 09:00"
-STATIC_SUBMISSION_END_TEXT = "Thursday 6 June 16:00"
-STATIC_OASIS_END_TEXT = "Friday 7 June 16:00"
-STATIC_PROJECT_ALLOC_DISPLAY_TEXT = "Displaying project rooms for the week of 27 May 2024."
-STATIC_OASIS_ALLOC_DISPLAY_TEXT = "Displaying Oasis for the week of 27 May 2024."
 
 # -----------------------------------------------------
 # Database Connection Pool
@@ -69,32 +61,32 @@ def return_connection(pool, conn):
 pool = get_db_connection_pool()
 
 # -----------------------------------------------------
-# Helper to load/update display dates and UI texts (USING STATIC VALUES)
+# Initialize session state ONLY ONCE with default values
 # -----------------------------------------------------
 
-# Initialize session state with STATIC values - these will NEVER change automatically
+# Initialize database date values (these stay fixed unless manually changed in admin)
 if "project_rooms_display_monday" not in st.session_state:
     st.session_state.project_rooms_display_monday = STATIC_PROJECT_MONDAY
 if "oasis_display_monday" not in st.session_state:
     st.session_state.oasis_display_monday = STATIC_OASIS_MONDAY
 
-# Use PURE STATIC TEXT - no date calculations whatsoever
+# Initialize EDITABLE TEXT VALUES - these can be changed in admin section
 if "submission_week_of_text" not in st.session_state: 
-    st.session_state["submission_week_of_text"] = STATIC_SUBMISSION_WEEK_TEXT
+    st.session_state["submission_week_of_text"] = "3 June"
 
 if "submission_start_text" not in st.session_state:
-    st.session_state["submission_start_text"] = STATIC_SUBMISSION_START_TEXT
+    st.session_state["submission_start_text"] = "Wednesday 5 June 09:00"
 if "submission_end_text" not in st.session_state:
-    st.session_state["submission_end_text"] = STATIC_SUBMISSION_END_TEXT
+    st.session_state["submission_end_text"] = "Thursday 6 June 16:00"
 if "oasis_end_text" not in st.session_state:
-    st.session_state["oasis_end_text"] = STATIC_OASIS_END_TEXT
+    st.session_state["oasis_end_text"] = "Friday 7 June 16:00"
 
-# Use pure static text - NO date formatting
+# Initialize EDITABLE HEADER TEXT - these can be changed in admin section
 if "project_allocations_display_markdown_content" not in st.session_state:
-    st.session_state["project_allocations_display_markdown_content"] = STATIC_PROJECT_ALLOC_DISPLAY_TEXT
+    st.session_state["project_allocations_display_markdown_content"] = "Displaying project rooms for the week of 27 May 2024."
 
 if "oasis_allocations_display_markdown_content" not in st.session_state:
-    st.session_state["oasis_allocations_display_markdown_content"] = STATIC_OASIS_ALLOC_DISPLAY_TEXT
+    st.session_state["oasis_allocations_display_markdown_content"] = "Displaying Oasis for the week of 27 May 2024."
 
 
 # -----------------------------------------------------
@@ -280,7 +272,9 @@ with st.expander("🔐 Admin Controls"):
     if pwd == RESET_PASSWORD:
         st.success("✅ Access granted.")
 
-        st.subheader("💼 Update Configurable Texts (for Submission Forms & General Info)")
+        st.subheader("💼 Update All Display Texts")
+        st.markdown("**Note:** These texts are purely for display and will persist after refresh.")
+        
         new_submission_week_of_text = st.text_input(
             "Text for 'Submissions for the week of ...' (e.g., '9 June')", 
             st.session_state["submission_week_of_text"],
@@ -302,25 +296,27 @@ with st.expander("🔐 Admin Controls"):
             key="conf_oasis_end_text"
         )
         
-        new_project_alloc_display_markdown = st.text_input(
-            "Text for 'Project Room Allocations' section header (can override auto-text)", 
+        new_project_alloc_display_markdown = st.text_area(
+            "Header text for 'Project Room Allocations' section", 
             st.session_state["project_allocations_display_markdown_content"],
-            key="conf_proj_alloc_header"
+            key="conf_proj_alloc_header",
+            height=100
         )
-        new_oasis_alloc_display_markdown = st.text_input(
-            "Text for 'Oasis Allocations' section header (can override auto-text)", 
+        new_oasis_alloc_display_markdown = st.text_area(
+            "Header text for 'Oasis Allocations' section", 
             st.session_state["oasis_allocations_display_markdown_content"],
-            key="conf_oasis_alloc_header"
+            key="conf_oasis_alloc_header",
+            height=100
         )
         
-        if st.button("Update All Configurable Texts", key="btn_update_conf_texts"):
+        if st.button("💾 Update All Display Texts", key="btn_update_conf_texts"):
             st.session_state["submission_week_of_text"] = new_submission_week_of_text
             st.session_state["submission_start_text"] = new_sub_start_text
             st.session_state["submission_end_text"] = new_sub_end_text
             st.session_state["oasis_end_text"] = new_oasis_end_text
             st.session_state["project_allocations_display_markdown_content"] = new_project_alloc_display_markdown
             st.session_state["oasis_allocations_display_markdown_content"] = new_oasis_alloc_display_markdown
-            st.success("All configurable texts updated!")
+            st.success("✅ All display texts updated and will persist after refresh!")
             st.rerun()
 
         st.subheader("🧠 Project Room Admin")
@@ -330,7 +326,6 @@ with st.expander("🔐 Admin Controls"):
                 success, _ = run_allocation(DATABASE_URL, only="project", base_monday_date=st.session_state.project_rooms_display_monday) 
 
                 if success:
-                    # Don't change any display text - keep it static
                     st.success(f"✅ Project room allocation completed.")
                     st.rerun()
                 else:
@@ -345,7 +340,6 @@ with st.expander("🔐 Admin Controls"):
                 success, _ = run_allocation(DATABASE_URL, only="oasis", base_monday_date=st.session_state.oasis_display_monday) 
 
                 if success:
-                    # Don't change any display text - keep it static
                     st.success(f"✅ Oasis allocation completed.")
                     st.rerun()
                 else:
@@ -356,7 +350,6 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
             current_proj_display_mon = st.session_state.project_rooms_display_monday
-            # st.markdown(f"*Editing project rooms for week: **{current_proj_display_mon.strftime('%Y-%m-%d')}***")
             alloc_df_admin = get_room_grid(pool, current_proj_display_mon)
             if not alloc_df_admin.empty:
                 editable_alloc_proj = st.data_editor(alloc_df_admin, num_rows="dynamic", use_container_width=True, key="edit_proj_allocations_data")
