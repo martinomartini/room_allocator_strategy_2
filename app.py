@@ -3,22 +3,23 @@ import psycopg2
 import psycopg2.pool
 import json
 import os
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date # Make sure date is imported
 import pytz
 import pandas as pd
 from psycopg2.extras import RealDictCursor
 
 # Placeholder for run_allocation if the file is not available
-# If you have a valid allocate_rooms.py, you would use:
-# from allocate_rooms import run_allocation
 # IMPORTANT: The real run_allocation function needs to use the 'allocated_week_monday'
 # passed to it to determine which week to process.
-def run_allocation(db_url, allocated_week_monday: date, only=None):
-    st.warning(f"Placeholder: run_allocation called for {only} for week starting {allocated_week_monday.strftime('%Y-%m-%d')}. Implement actual logic to process this specific week.")
-    # Simulate success for testing UI flow
-    # In a real scenario, this function would query preferences and write allocations
-    # for the 'allocated_week_monday'.
-    return True, f"Placeholder allocation successful for {allocated_week_monday.strftime('%Y-%m-%d')}"
+def run_allocation(db_url, allocated_week_monday: date, only=None): # Ensure 'date' type hint is recognized
+    st.warning(f"Placeholder Debug: run_allocation function was CALLED for {only} for week {allocated_week_monday.strftime('%Y-%m-%d')}.")
+    # Simulate some processing
+    # For example, if you want to test failure:
+    # if allocated_week_monday.day > 15: # Arbitrary condition for testing failure
+    #     st.error("Placeholder Debug: Simulated failure in run_allocation.")
+    #     return False, "Simulated processing error."
+    st.info("Placeholder Debug: run_allocation is now returning True.")
+    return True, f"Placeholder: Simulated successful allocation for {allocated_week_monday.strftime('%Y-%m-%d')}"
 
 
 # -----------------------------------------------------
@@ -105,11 +106,11 @@ if "submission_week_of_text" not in st.session_state or parsed_proj_date :
     st.session_state["submission_week_of_text"] = default_submission_week_of_text
 
 if "submission_start_text" not in st.session_state:
-    st.session_state["submission_start_text"] = "Wednesday 4 June 09:00" # Example, should be configurable
+    st.session_state["submission_start_text"] = "Wednesday 4 June 09:00" 
 if "submission_end_text" not in st.session_state:
-    st.session_state["submission_end_text"] = "Thursday 5 June 16:00" # Example
+    st.session_state["submission_end_text"] = "Thursday 5 June 16:00" 
 if "oasis_end_text" not in st.session_state:
-    st.session_state["oasis_end_text"] = "Friday 6 June 16:00" # Example
+    st.session_state["oasis_end_text"] = "Friday 6 June 16:00" 
 
 default_project_alloc_markdown = f"Displaying project rooms for the week of {st.session_state.project_rooms_display_monday.strftime('%-d %B %Y')}."
 if "project_allocations_display_markdown_content" not in st.session_state or parsed_proj_date:
@@ -123,7 +124,7 @@ if "oasis_allocations_display_markdown_content" not in st.session_state or parse
 # -----------------------------------------------------
 # Database Utility Functions
 # -----------------------------------------------------
-def get_room_grid(pool, display_monday: date): # CORRECTED FUNCTION
+def get_room_grid(pool, display_monday: date):
     if not pool: return pd.DataFrame()
     this_monday = display_monday
     day_mapping = {
@@ -148,7 +149,7 @@ def get_room_grid(pool, display_monday: date): # CORRECTED FUNCTION
     if not conn: 
         if grid:
             return pd.DataFrame(list(grid.values()))
-        else: # Should not happen if all_rooms was not empty, but as a safeguard
+        else: 
             return pd.DataFrame(columns=expected_columns)
             
     try:
@@ -379,38 +380,69 @@ with st.expander("🔐 Admin Controls"):
 
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
+            st.write("Debug: 'Run Project Room Allocation' button clicked.") # DEBUG START
             if 'run_allocation' in globals() and callable(run_allocation):
-                allocated_week_monday = st.session_state.project_rooms_display_monday
+                st.write(f"Debug: run_allocation function found. Type: {type(run_allocation)}") 
                 
-                success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="project")
-
-                if success:
-                    st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
-                    st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                    st.success(f"✅ Project room allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
-                    st.rerun()
+                allocated_week_monday = st.session_state.project_rooms_display_monday
+                st.write(f"Debug: Allocated week monday from session state: {allocated_week_monday} (Type: {type(allocated_week_monday)})") 
+                
+                if not isinstance(allocated_week_monday, date): # Ensure it's a date object
+                    st.error(f"Debug: Error - allocated_week_monday is not a date object! Value: {allocated_week_monday}")
                 else:
-                    st.error(f"❌ Project room allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="project")
+                    st.write(f"Debug: run_allocation returned success={success}, message='{message}'") 
+
+                    if success:
+                        st.write("Debug: run_allocation was successful. Updating state and query params.") 
+                        try:
+                            st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
+                            st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
+                            
+                            st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
+                            st.write(f"Debug: Query param 'proj_date' set to {allocated_week_monday.strftime('%Y-%m-%d')}")
+
+                            st.success(f"✅ Project room allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                            st.write("Debug: About to rerun.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Debug: Error during success block: {e}")
+                    else:
+                        st.error(f"❌ Project room allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
-                st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
+                st.error("Debug: run_allocation function not available or not callable. Please ensure allocate_rooms.py is correctly set up if used, or the placeholder is defined.")
+
 
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
+            st.write("Debug: 'Run Oasis Allocation' button clicked.") # DEBUG
             if 'run_allocation' in globals() and callable(run_allocation):
+                st.write(f"Debug: run_allocation function found. Type: {type(run_allocation)}") # DEBUG
                 allocated_week_monday = st.session_state.oasis_display_monday
+                st.write(f"Debug: Allocated week monday (Oasis) from session state: {allocated_week_monday} (Type: {type(allocated_week_monday)})") # DEBUG
 
-                success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="oasis")
-
-                if success:
-                    st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                    st.success(f"✅ Oasis allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
-                    st.rerun()
+                if not isinstance(allocated_week_monday, date): # Ensure it's a date object
+                    st.error(f"Debug: Error - allocated_week_monday (Oasis) is not a date object! Value: {allocated_week_monday}")
                 else:
-                    st.error(f"❌ Oasis allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="oasis")
+                    st.write(f"Debug: run_allocation (Oasis) returned success={success}, message='{message}'") # DEBUG
+
+                    if success:
+                        st.write("Debug: run_allocation (Oasis) was successful. Updating state and query params.") # DEBUG
+                        try:
+                            st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
+                            st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
+                            st.write(f"Debug: Query param 'oasis_date' set to {allocated_week_monday.strftime('%Y-%m-%d')}") # DEBUG
+                            st.success(f"✅ Oasis allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                            st.write("Debug: About to rerun (Oasis).") # DEBUG
+                            st.rerun()
+                        except Exception as e:
+                             st.error(f"Debug: Error during Oasis success block: {e}") # DEBUG
+                    else:
+                        st.error(f"❌ Oasis allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
-                st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
+                st.error("Debug: run_allocation function not available or not callable (Oasis).")
+
 
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
@@ -630,11 +662,16 @@ with st.form("oasis_form_main"):
 # -----------------------------------------------------
 st.header("📌 Project Room Allocations")
 st.markdown(st.session_state.get('project_allocations_display_markdown_content', default_project_alloc_markdown))
-alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday)
-if alloc_display_df.empty:
-    st.write(f"No project room allocations yet for the week of {st.session_state.project_rooms_display_monday.strftime('%d %B %Y')}.")
+# Ensure project_rooms_display_monday is a date object before passing to get_room_grid
+if isinstance(st.session_state.project_rooms_display_monday, date):
+    alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday)
+    if alloc_display_df.empty:
+        st.write(f"No project room allocations yet for the week of {st.session_state.project_rooms_display_monday.strftime('%d %B %Y')}.")
+    else:
+        st.dataframe(alloc_display_df, use_container_width=True, hide_index=True)
 else:
-    st.dataframe(alloc_display_df, use_container_width=True, hide_index=True)
+    st.error("Error: Project rooms display date is not configured correctly.")
+
 
 # -----------------------------------------------------
 # Ad-hoc Oasis Addition
@@ -701,114 +738,119 @@ with st.form("oasis_add_form_main"):
 st.header("📊 Full Weekly Oasis Overview")
 st.markdown(st.session_state.get('oasis_allocations_display_markdown_content', default_oasis_alloc_markdown))
 oasis_overview_monday_display = st.session_state.oasis_display_monday
-oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
-oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
-oasis_capacity = oasis.get("capacity", 15)
 
-conn_matrix = get_connection(pool)
-if not conn_matrix: st.error("No DB connection for Oasis Overview")
-else:
-    try:
-        with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute( 
-                "SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s",
-                (oasis_overview_monday_display, oasis_overview_days_dates[-1])
-            )
-            rows = cur.fetchall()
+if isinstance(oasis_overview_monday_display, date): # Ensure it's a date
+    oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
+    oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
+    oasis_capacity = oasis.get("capacity", 15)
 
-        df_matrix_data = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["team_name", "date"])
-        if not df_matrix_data.empty:
-            df_matrix_data["date"] = pd.to_datetime(df_matrix_data["date"]).dt.date
+    conn_matrix = get_connection(pool)
+    if not conn_matrix: st.error("No DB connection for Oasis Overview")
+    else:
+        try:
+            with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute( 
+                    "SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s",
+                    (oasis_overview_monday_display, oasis_overview_days_dates[-1])
+                )
+                rows = cur.fetchall()
 
-        unique_names_allocated = set(df_matrix_data["team_name"]) if not df_matrix_data.empty else set()
-        names_from_prefs = set()
-        try: 
-            with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur: 
-                cur.execute("SELECT DISTINCT person_name FROM oasis_preferences")
-                pref_rows = cur.fetchall()
-                names_from_prefs = {row["person_name"] for row in pref_rows}
-        except psycopg2.Error: st.warning("Could not fetch names from Oasis preferences for matrix display.")
-        
-        all_relevant_names_list = list(unique_names_allocated.union(names_from_prefs))
-        if "Niek" not in all_relevant_names_list:
-             all_relevant_names_list.append("Niek")
-        all_relevant_names = sorted(list(set(all_relevant_names_list)))
-        
-        if not all_relevant_names:
-            initial_matrix_df = pd.DataFrame(columns=oasis_overview_day_names)
-        else:
-            initial_matrix_df = pd.DataFrame(False, index=all_relevant_names, columns=oasis_overview_day_names)
+            df_matrix_data = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["team_name", "date"])
+            if not df_matrix_data.empty:
+                df_matrix_data["date"] = pd.to_datetime(df_matrix_data["date"]).dt.date
 
-            if not df_matrix_data.empty: 
-                for _, row_data in df_matrix_data.iterrows():
-                    person_name = row_data["team_name"]
-                    alloc_date = row_data["date"]
-                    if alloc_date in oasis_overview_days_dates and person_name in initial_matrix_df.index:
-                        initial_matrix_df.at[person_name, alloc_date.strftime("%A")] = True
+            unique_names_allocated = set(df_matrix_data["team_name"]) if not df_matrix_data.empty else set()
+            names_from_prefs = set()
+            try: 
+                with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur: 
+                    cur.execute("SELECT DISTINCT person_name FROM oasis_preferences")
+                    pref_rows = cur.fetchall()
+                    names_from_prefs = {row["person_name"] for row in pref_rows}
+            except psycopg2.Error: st.warning("Could not fetch names from Oasis preferences for matrix display.")
             
-            if "Niek" in initial_matrix_df.index: 
-                for day_n in oasis_overview_day_names: initial_matrix_df.at["Niek", day_n] = True
-        
-        st.subheader("🪑 Oasis Availability Summary")
-        current_day_alloc_counts = {day_dt: 0 for day_dt in oasis_overview_days_dates}
-        if not df_matrix_data.empty:
-            for day_dt_check in oasis_overview_days_dates:
-                current_day_alloc_counts[day_dt_check] = df_matrix_data[df_matrix_data["date"] == day_dt_check]["team_name"].nunique()
+            all_relevant_names_list = list(unique_names_allocated.union(names_from_prefs))
+            if "Niek" not in all_relevant_names_list:
+                 all_relevant_names_list.append("Niek")
+            all_relevant_names = sorted(list(set(all_relevant_names_list)))
+            
+            if not all_relevant_names:
+                initial_matrix_df = pd.DataFrame(columns=oasis_overview_day_names)
+            else:
+                initial_matrix_df = pd.DataFrame(False, index=all_relevant_names, columns=oasis_overview_day_names)
 
-        for day_dt, day_str_label in zip(oasis_overview_days_dates, oasis_overview_day_names):
-            used_spots = current_day_alloc_counts[day_dt]
-            spots_left = max(0, oasis_capacity - used_spots)
-            st.markdown(f"**{day_str_label}**: {spots_left} spot(s) left (out of {oasis_capacity})")
+                if not df_matrix_data.empty: 
+                    for _, row_data in df_matrix_data.iterrows():
+                        person_name = row_data["team_name"]
+                        alloc_date = row_data["date"]
+                        if alloc_date in oasis_overview_days_dates and person_name in initial_matrix_df.index:
+                            initial_matrix_df.at[person_name, alloc_date.strftime("%A")] = True
+                
+                if "Niek" in initial_matrix_df.index: 
+                    for day_n in oasis_overview_day_names: initial_matrix_df.at["Niek", day_n] = True
+            
+            st.subheader("🪑 Oasis Availability Summary")
+            current_day_alloc_counts = {day_dt: 0 for day_dt in oasis_overview_days_dates}
+            if not df_matrix_data.empty:
+                for day_dt_check in oasis_overview_days_dates:
+                    current_day_alloc_counts[day_dt_check] = df_matrix_data[df_matrix_data["date"] == day_dt_check]["team_name"].nunique()
 
-        if not initial_matrix_df.empty:
-            edited_matrix = st.data_editor(
-                initial_matrix_df, 
-                use_container_width=True,
-                disabled=["Niek"] if "Niek" in initial_matrix_df.index else [], 
-                key="oasis_matrix_editor_main"
-            )
+            for day_dt, day_str_label in zip(oasis_overview_days_dates, oasis_overview_day_names):
+                used_spots = current_day_alloc_counts[day_dt]
+                spots_left = max(0, oasis_capacity - used_spots)
+                st.markdown(f"**{day_str_label}**: {spots_left} spot(s) left (out of {oasis_capacity})")
 
-            if st.button("💾 Save Oasis Matrix Changes", key="btn_save_oasis_matrix_changes"):
-                try:
-                    with conn_matrix.cursor() as cur:
-                        cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
-                        
-                        if "Niek" in edited_matrix.index: 
-                            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
-                            for day_idx, day_col_name in enumerate(oasis_overview_day_names):
-                                if edited_matrix.at["Niek", day_col_name]:
-                                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", ("Niek", "Oasis", oasis_overview_monday_display + timedelta(days=day_idx)))
-                        
-                        occupied_counts_per_day = {day_col: 0 for day_col in oasis_overview_day_names}
-                        if "Niek" in edited_matrix.index: 
-                            for day_col_name in oasis_overview_day_names:
-                                if edited_matrix.at["Niek", day_col_name]:
-                                    occupied_counts_per_day[day_col_name] +=1
-                                    
-                        for person_name_matrix in edited_matrix.index: 
-                            if person_name_matrix == "Niek": continue 
-                            for day_idx, day_col_name in enumerate(oasis_overview_day_names):
-                                if edited_matrix.at[person_name_matrix, day_col_name]: 
-                                    if occupied_counts_per_day[day_col_name] < oasis_capacity:
-                                        alloc_date = oasis_overview_monday_display + timedelta(days=day_idx)
-                                        cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name_matrix, "Oasis", alloc_date))
-                                        occupied_counts_per_day[day_col_name] += 1
-                                    else:
-                                        alloc_date_str = (oasis_overview_monday_display + timedelta(days=day_idx)).strftime('%d %b')
-                                        st.warning(f"⚠️ {person_name_matrix} could not be added to Oasis on {day_col_name} ({alloc_date_str}): capacity ({oasis_capacity}) reached.")
+            if not initial_matrix_df.empty:
+                edited_matrix = st.data_editor(
+                    initial_matrix_df, 
+                    use_container_width=True,
+                    disabled=["Niek"] if "Niek" in initial_matrix_df.index else [], 
+                    key="oasis_matrix_editor_main"
+                )
+
+                if st.button("💾 Save Oasis Matrix Changes", key="btn_save_oasis_matrix_changes"):
+                    try:
+                        with conn_matrix.cursor() as cur:
+                            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
+                            
+                            if "Niek" in edited_matrix.index: 
+                                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
+                                for day_idx, day_col_name in enumerate(oasis_overview_day_names):
+                                    if edited_matrix.at["Niek", day_col_name]:
+                                        cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", ("Niek", "Oasis", oasis_overview_monday_display + timedelta(days=day_idx)))
+                            
+                            occupied_counts_per_day = {day_col: 0 for day_col in oasis_overview_day_names}
+                            if "Niek" in edited_matrix.index: 
+                                for day_col_name in oasis_overview_day_names:
+                                    if edited_matrix.at["Niek", day_col_name]:
+                                        occupied_counts_per_day[day_col_name] +=1
                                         
-                        conn_matrix.commit()
-                        st.success("✅ Oasis Matrix saved successfully!")
-                        st.rerun()
-                except Exception as e_matrix_save:
-                    st.error(f"❌ Failed to save Oasis Matrix: {e_matrix_save}")
-                    if conn_matrix: conn_matrix.rollback()
-        else:
-            st.info(f"No Oasis data to display or edit for the week of {oasis_overview_monday_display.strftime('%d %B %Y')}.")
+                            for person_name_matrix in edited_matrix.index: 
+                                if person_name_matrix == "Niek": continue 
+                                for day_idx, day_col_name in enumerate(oasis_overview_day_names):
+                                    if edited_matrix.at[person_name_matrix, day_col_name]: 
+                                        if occupied_counts_per_day[day_col_name] < oasis_capacity:
+                                            alloc_date = oasis_overview_monday_display + timedelta(days=day_idx)
+                                            cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name_matrix, "Oasis", alloc_date))
+                                            occupied_counts_per_day[day_col_name] += 1
+                                        else:
+                                            alloc_date_str = (oasis_overview_monday_display + timedelta(days=day_idx)).strftime('%d %b')
+                                            st.warning(f"⚠️ {person_name_matrix} could not be added to Oasis on {day_col_name} ({alloc_date_str}): capacity ({oasis_capacity}) reached.")
+                                            
+                            conn_matrix.commit()
+                            st.success("✅ Oasis Matrix saved successfully!")
+                            st.rerun()
+                    except Exception as e_matrix_save:
+                        st.error(f"❌ Failed to save Oasis Matrix: {e_matrix_save}")
+                        if conn_matrix: conn_matrix.rollback()
+            else:
+                st.info(f"No Oasis data to display or edit for the week of {oasis_overview_monday_display.strftime('%d %B %Y')}.")
 
-    except Exception as e_matrix_load:
-        st.error(f"❌ Error loading Oasis Matrix data: {e_matrix_load}")
-    finally: return_connection(pool, conn_matrix)
+        except Exception as e_matrix_load:
+            st.error(f"❌ Error loading Oasis Matrix data: {e_matrix_load}")
+        finally: return_connection(pool, conn_matrix)
+else:
+    st.error("Error: Oasis display date is not configured correctly.")
+
 
 # -----------------------------------------------------
 # Final Note: DB connectivity check
