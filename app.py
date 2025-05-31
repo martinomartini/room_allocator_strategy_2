@@ -12,7 +12,7 @@ from allocate_rooms import run_allocation  # Assuming this file exists and is co
 # -----------------------------------------------------
 # Configuration and Global Constants
 # -----------------------------------------------------
-st.set_page_config(page_title="Weekly Room Allocator - TS", layout="wide")
+st.set_page_config(page_title="Weekly Room Allocator Strategy", layout="wide")
 
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
@@ -32,7 +32,7 @@ try:
 except FileNotFoundError:
     st.error(f"Error: {ROOMS_FILE} not found. Please ensure it exists in the application directory.")
     AVAILABLE_ROOMS = []
-oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 15})
+oasis = next((r for r in AVAILABLE_ROOMS if r["name"] == "Oasis"), {"capacity": 20})
 
 # -----------------------------------------------------
 # STATIC DATE CONFIGURATION - EDIT THESE VALUES MANUALLY
@@ -229,8 +229,8 @@ def insert_preference(pool, team, contact, size, days):
     if not team or not contact:
         st.error("❌ Team Name and Contact Person are required.")
         return False
-    if not 3 <= size <= 6: 
-        st.error("❌ Team size must be between 3 and 6.")
+    if not 3 <= size <= 4: 
+        st.error("❌ Team size must be between 3 and 4.")
         return False
     conn = get_connection(pool)
     if not conn: return False
@@ -296,7 +296,7 @@ st.info(
     💡 **How This Works:**
     
     - 🧑‍🤝‍🧑 Project teams can select **either Monday & Wednesday** or **Tuesday & Thursday**. **Friday** is (for now) flexible. 
-      There are 6 rooms for 4 persons and 1 room for 6 persons.
+      There are 4 rooms for 4 persons.
     - 🌿 Oasis users can choose **up to 5 preferred weekdays**, and will be randomly assigned—fairness is guaranteed. 
       There are 16 places in the Oasis.
     - ❗ You may only submit **once**. If you need to change your input, contact an admin.
@@ -579,7 +579,7 @@ st.markdown(
 with st.form("team_form_main"):
     team_name = st.text_input("Team Name", key="tf_team_name")
     contact_person = st.text_input("Contact Person", key="tf_contact_person")
-    team_size = st.number_input("Team Size (3-6)", min_value=3, max_value=6, value=3, key="tf_team_size")
+    team_size = st.number_input("Team Size (3-4)", min_value=3, max_value=4, value=3, key="tf_team_size")
     day_choice = st.selectbox("Preferred Days", ["Monday and Wednesday", "Tuesday and Thursday"], key="tf_day_choice")
     submit_team_pref = st.form_submit_button("Submit Project Room Request")
 
@@ -664,7 +664,7 @@ with st.form("oasis_add_form_main"):
                             date_obj = current_oasis_display_mon_adhoc + timedelta(days=days_map_indices[day_str])
                             cur.execute("SELECT COUNT(*) FROM weekly_allocations WHERE room_name = 'Oasis' AND date = %s", (date_obj,))
                             count = cur.fetchone()[0]
-                            if count >= oasis.get("capacity", 15):
+                            if count >= oasis.get("capacity", 20):
                                 st.warning(f"⚠️ Oasis is full on {day_str}. Could not add {name_clean}.")
                                 added_to_all_selected = False
                             else:
@@ -688,7 +688,7 @@ st.markdown(admin_settings['oasis_allocations_display_markdown_content'])
 oasis_overview_monday_display = st.session_state.oasis_display_monday 
 oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
 oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
-oasis_capacity = oasis.get("capacity", 15)
+oasis_capacity = oasis.get("capacity", 20)
 
 conn_matrix = get_connection(pool)
 if not conn_matrix: st.error("No DB connection for Oasis Overview")
@@ -726,8 +726,8 @@ else:
                 if alloc_date in oasis_overview_days_dates and person_name in initial_matrix_df.index:
                     initial_matrix_df.at[person_name, alloc_date.strftime("%A")] = True
         
-        if "Niek" in initial_matrix_df.index: 
-            for day_n in oasis_overview_day_names: initial_matrix_df.at["Niek", day_n] = True
+        if "Bud" in initial_matrix_df.index: 
+            for day_n in oasis_overview_day_names: initial_matrix_df.at["Bud", day_n] = True
         
         st.subheader("🪑 Oasis Availability Summary")
         current_day_alloc_counts = {day_dt: 0 for day_dt in oasis_overview_days_dates}
@@ -743,28 +743,28 @@ else:
         edited_matrix = st.data_editor(
             initial_matrix_df, 
             use_container_width=True,
-            disabled=["Niek"] if "Niek" in initial_matrix_df.index else [], 
+            disabled=["Bud"] if "Bud" in initial_matrix_df.index else [], 
             key="oasis_matrix_editor_main"
         )
 
         if st.button("💾 Save Oasis Matrix Changes", key="btn_save_oasis_matrix_changes"):
             try:
                 with conn_matrix.cursor() as cur:
-                    cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
-                    if "Niek" in edited_matrix.index: 
-                        cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
+                    cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Bud' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
+                    if "Bud" in edited_matrix.index: 
+                        cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = 'Bud' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
                         for day_idx, day_col_name in enumerate(oasis_overview_day_names):
-                            if edited_matrix.at["Niek", day_col_name]:
-                                cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", ("Niek", "Oasis", oasis_overview_monday_display + timedelta(days=day_idx)))
+                            if edited_matrix.at["Bud", day_col_name]:
+                                cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", ("Bud", "Oasis", oasis_overview_monday_display + timedelta(days=day_idx)))
                     
                     occupied_counts_per_day = {day_col: 0 for day_col in oasis_overview_day_names}
-                    if "Niek" in edited_matrix.index: 
+                    if "Bud" in edited_matrix.index: 
                         for day_col_name in oasis_overview_day_names:
-                            if edited_matrix.at["Niek", day_col_name]:
+                            if edited_matrix.at["Bud", day_col_name]:
                                 occupied_counts_per_day[day_col_name] +=1
                                 
                     for person_name_matrix in edited_matrix.index: 
-                        if person_name_matrix == "Niek": continue 
+                        if person_name_matrix == "Bud": continue 
                         for day_idx, day_col_name in enumerate(oasis_overview_day_names):
                             if edited_matrix.at[person_name_matrix, day_col_name]: 
                                 if occupied_counts_per_day[day_col_name] < oasis_capacity:
