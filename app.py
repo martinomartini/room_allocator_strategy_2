@@ -502,7 +502,7 @@ st.markdown(
 with st.form("team_form_main"):
     team_name = st.text_input("Team Name", key="tf_team_name")
     contact_person = st.text_input("Contact Person", key="tf_contact_person")
-    team_size = st.number_input("Team Size (3-6)", min_value=3, max_value=6, value=3, key="tf_team_size")
+    team_size = st.number_input("Team Size (3-4)", min_value=3, max_value=4, value=3, key="tf_team_size")
     day_choice = st.selectbox("Preferred Days", ["Monday and Wednesday", "Tuesday and Thursday"], key="tf_day_choice")
     submit_team_pref = st.form_submit_button("Submit Project Room Request")
 
