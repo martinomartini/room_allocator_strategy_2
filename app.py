@@ -11,10 +11,14 @@ from psycopg2.extras import RealDictCursor
 # Placeholder for run_allocation if the file is not available
 # If you have a valid allocate_rooms.py, you would use:
 # from allocate_rooms import run_allocation
-def run_allocation(db_url, only=None):
-    st.warning(f"Placeholder: run_allocation called for {only}. Implement actual logic.")
+# IMPORTANT: The real run_allocation function needs to use the 'allocated_week_monday'
+# passed to it to determine which week to process.
+def run_allocation(db_url, allocated_week_monday: date, only=None):
+    st.warning(f"Placeholder: run_allocation called for {only} for week starting {allocated_week_monday.strftime('%Y-%m-%d')}. Implement actual logic to process this specific week.")
     # Simulate success for testing UI flow
-    return True, "Placeholder allocation successful"
+    # In a real scenario, this function would query preferences and write allocations
+    # for the 'allocated_week_monday'.
+    return True, f"Placeholder allocation successful for {allocated_week_monday.strftime('%Y-%m-%d')}"
 
 
 # -----------------------------------------------------
@@ -70,7 +74,6 @@ pool = get_db_connection_pool()
 # Helper to load/update display dates and UI texts
 # -----------------------------------------------------
 
-# Get dates from URL query parameters first using the new API
 initial_proj_date_str = st.query_params.get("proj_date")
 initial_oasis_date_str = st.query_params.get("oasis_date")
 
@@ -102,11 +105,11 @@ if "submission_week_of_text" not in st.session_state or parsed_proj_date :
     st.session_state["submission_week_of_text"] = default_submission_week_of_text
 
 if "submission_start_text" not in st.session_state:
-    st.session_state["submission_start_text"] = "Wednesday 4 June 09:00"
+    st.session_state["submission_start_text"] = "Wednesday 4 June 09:00" # Example, should be configurable
 if "submission_end_text" not in st.session_state:
-    st.session_state["submission_end_text"] = "Thursday 5 June 16:00"
+    st.session_state["submission_end_text"] = "Thursday 5 June 16:00" # Example
 if "oasis_end_text" not in st.session_state:
-    st.session_state["oasis_end_text"] = "Friday 6 June 16:00"
+    st.session_state["oasis_end_text"] = "Friday 6 June 16:00" # Example
 
 default_project_alloc_markdown = f"Displaying project rooms for the week of {st.session_state.project_rooms_display_monday.strftime('%-d %B %Y')}."
 if "project_allocations_display_markdown_content" not in st.session_state or parsed_proj_date:
@@ -139,7 +142,7 @@ def get_room_grid(pool, display_monday: date):
         return pd.DataFrame(columns=["Room"] + day_labels)
 
     conn = get_connection(pool)
-    if not conn: return pd.DataFrame(list(grid.values()))
+    if not conn: return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels) #MODIFIED
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             start_date, end_date = this_monday, this_monday + timedelta(days=3)
@@ -159,7 +162,7 @@ def get_room_grid(pool, display_monday: date):
         return pd.DataFrame(list(grid.values()))
     except psycopg2.Error as e:
         st.warning(f"Database error while getting room grid: {e}")
-        return pd.DataFrame(list(grid.values()))
+        return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels) #MODIFIED
     finally: return_connection(pool, conn)
 
 def get_preferences(pool):
@@ -264,33 +267,12 @@ st.info(
     """
     💡 **How This Works:**
     
-    - 🧑‍🤝‍🧑 Project teams can select **either Monday & Wednesday** or **Tuesday & Thursday**. **Friday** is (for now) flexible. 
-      There are 6 rooms for 4 persons and 1 room for 6 persons.
-    - 🌿 Oasis users can choose **up to 5 preferred weekdays**, and will be randomly assigned—fairness is guaranteed. 
-      There are 16 places in the Oasis.
-    - ❗ You may only submit **once**. If you need to change your input, contact an admin.
-    - 🗓️ **From Wednesday 09:00** you can submit your **project room preference** until **Thursday 16:00**. 
-      The allocations will be shared on **Thursday at 16:00**.
-    - 🌿 **Oasis preferences** can be submitted **from Wednesday 09:00 until Friday 16:00**, 
-      and allocation will be done at **Friday 16:00**.
-    - ✅ Allocations are refreshed **weekly** by an admin. 
-        
-    ---
-    
-    ### 🌿 Oasis: How to Join
-    
-    1. **✅ Reserve Oasis Seat (recommended)**  
-       ➤ Submit your **preferred days** (up to 5).  
-       ➤ Allocation is done **automatically and fairly** at **Friday 16:00**.  
-       ➤ Everyone gets **at least one** of their preferred days, depending on availability.
-
-    2. **⚠️ Add Yourself to Oasis Allocation (only if you forgot)**  
-       ➤ Use this **only if you missed the deadline** or forgot to submit your preferences.  
-       ➤ You will be added **immediately** to the selected days **if there’s space left**.  
-       ➤ This option does **not guarantee fairness** and bypasses the regular process.
-
-    ℹ️ Always use **"Reserve Oasis Seat"** before Friday 16:00 to ensure fair participation.  
-    Only use **"Add Yourself"** if you forgot to register.
+    - 🧑‍🤝‍🧑 Project teams select preferred days. Allocations aim for these days.
+    - 🌿 Oasis users pick preferred days. Allocation is fair, based on availability.
+    - ❗ Submissions are typically once per week. Contact admin for changes.
+    - 🗓️ **Project room preferences**: Submissions open based on admin-set times. Allocations are then run by an admin.
+    - 🌿 **Oasis preferences**: Similar submission window, admin runs allocation.
+    - ✅ Allocations are run by an admin for the displayed week.
     """
 )
 
@@ -305,7 +287,7 @@ with st.expander("🔐 Admin Controls"):
         st.success("✅ Access granted.")
 
         st.subheader("💼 Update Configurable Texts (for Submission Forms & General Info)")
-        
+        # ... (configurable text inputs remain the same) ...
         current_s_week_of_text = st.session_state.get("submission_week_of_text", default_submission_week_of_text)
         new_submission_week_of_text = st.text_input(
             "Text for 'Submissions for the week of ...' (e.g., '9 June')",
@@ -352,6 +334,7 @@ with st.expander("🔐 Admin Controls"):
             st.success("All configurable texts updated!")
             st.rerun()
 
+
         st.subheader("🗓️ Set Display Dates (Persists in URL)")
         admin_selected_project_display_date = st.date_input(
             "Set Project Rooms Display Week Starting Monday:",
@@ -376,7 +359,6 @@ with st.expander("🔐 Admin Controls"):
             st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {final_oasis_monday.strftime('%-d %B %Y')}."
             st.session_state["submission_week_of_text"] = final_project_monday.strftime("%-d %B")
             
-            # Set both query parameters, replacing any existing ones
             st.query_params = {
                 "proj_date": final_project_monday.strftime("%Y-%m-%d"),
                 "oasis_date": final_oasis_monday.strftime("%Y-%m-%d")
@@ -387,44 +369,45 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
             if 'run_allocation' in globals() and callable(run_allocation):
-                allocation_run_time = datetime.now(OFFICE_TIMEZONE)
-                allocated_week_monday = allocation_run_time.date() - timedelta(days=allocation_run_time.date().weekday())
+                # MODIFIED: Use the currently displayed project week for allocation
+                allocated_week_monday = st.session_state.project_rooms_display_monday
                 
-                success, _ = run_allocation(DATABASE_URL, only="project")
+                success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="project")
 
                 if success:
-                    st.session_state.project_rooms_display_monday = allocated_week_monday
+                    # The display is already set to this week, so no need to change session_state for dates.
+                    # Update markdown and submission text to be sure they reflect the processed week.
                     st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
                     st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Update only proj_date in query params, leave others
+                    # Ensure URL reflects the week processed, if it changed (though it shouldn't in this flow)
                     st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                    st.success(f"✅ Project room allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
+                    st.success(f"✅ Project room allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
                     st.rerun()
                 else:
-                    st.error("❌ Project room allocation failed.")
+                    st.error(f"❌ Project room allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
                 st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
 
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
             if 'run_allocation' in globals() and callable(run_allocation):
-                allocation_run_time = datetime.now(OFFICE_TIMEZONE)
-                allocated_week_monday = allocation_run_time.date() - timedelta(days=allocation_run_time.date().weekday())
+                # MODIFIED: Use the currently displayed oasis week for allocation
+                allocated_week_monday = st.session_state.oasis_display_monday
 
-                success, _ = run_allocation(DATABASE_URL, only="oasis")
+                success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="oasis")
 
                 if success:
-                    st.session_state.oasis_display_monday = allocated_week_monday
                     st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Update only oasis_date in query params, leave others
+                    # Ensure URL reflects the week processed
                     st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                    st.success(f"✅ Oasis allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
+                    st.success(f"✅ Oasis allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
                     st.rerun()
                 else:
-                    st.error("❌ Oasis allocation failed.")
+                    st.error(f"❌ Oasis allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
                 st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
 
+        # ... (Rest of the admin controls: Admin Edit, Resets remain largely the same) ...
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
             current_proj_display_mon = st.session_state.project_rooms_display_monday
