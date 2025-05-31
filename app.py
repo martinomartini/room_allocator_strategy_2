@@ -3,22 +3,18 @@ import psycopg2
 import psycopg2.pool
 import json
 import os
-from datetime import datetime, timedelta, date # Make sure date is imported
+from datetime import datetime, timedelta, date 
 import pytz
 import pandas as pd
 from psycopg2.extras import RealDictCursor
 
-# Placeholder for run_allocation if the file is not available
-# IMPORTANT: The real run_allocation function needs to use the 'allocated_week_monday'
-# passed to it to determine which week to process.
-def run_allocation(db_url, allocated_week_monday: date, only=None): # Ensure 'date' type hint is recognized
-    st.warning(f"Placeholder Debug: run_allocation function was CALLED for {only} for week {allocated_week_monday.strftime('%Y-%m-%d')}.")
-    # Simulate some processing
-    # For example, if you want to test failure:
-    # if allocated_week_monday.day > 15: # Arbitrary condition for testing failure
-    #     st.error("Placeholder Debug: Simulated failure in run_allocation.")
-    #     return False, "Simulated processing error."
-    st.info("Placeholder Debug: run_allocation is now returning True.")
+# Placeholder for run_allocation.
+# This function will now always be called with the *actual current week's Monday*
+# by the "Run..." buttons.
+def run_allocation(db_url, allocated_week_monday: date, only=None):
+    st.warning(f"Placeholder: run_allocation CALLED for {only} for week {allocated_week_monday.strftime('%Y-%m-%d')}.")
+    # In a real scenario, this function would query preferences and write allocations
+    # for the 'allocated_week_monday'.
     return True, f"Placeholder: Simulated successful allocation for {allocated_week_monday.strftime('%Y-%m-%d')}"
 
 
@@ -29,7 +25,7 @@ st.set_page_config(page_title="Weekly Room Allocator - TS", layout="wide")
 
 DATABASE_URL = st.secrets.get("SUPABASE_DB_URI", os.environ.get("SUPABASE_DB_URI"))
 OFFICE_TIMEZONE_STR = st.secrets.get("OFFICE_TIMEZONE", os.environ.get("OFFICE_TIMEZONE", "UTC"))
-RESET_PASSWORD = "trainee"  # Consider moving to secrets
+RESET_PASSWORD = "trainee"
 
 try:
     OFFICE_TIMEZONE = pytz.timezone(OFFICE_TIMEZONE_STR)
@@ -284,7 +280,7 @@ st.info(
     - ❗ Submissions are typically once per week. Contact admin for changes.
     - 🗓️ **Project room preferences**: Submissions open based on admin-set times. Allocations are then run by an admin.
     - 🌿 **Oasis preferences**: Similar submission window, admin runs allocation.
-    - ✅ Allocations are run by an admin for the displayed week.
+    - ✅ "Run Allocation" buttons process the **actual current week**. Use "Set Display Dates" to view/edit other weeks.
     """
 )
 
@@ -380,69 +376,48 @@ with st.expander("🔐 Admin Controls"):
 
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
-            st.write("Debug: 'Run Project Room Allocation' button clicked.") # DEBUG START
             if 'run_allocation' in globals() and callable(run_allocation):
-                st.write(f"Debug: run_allocation function found. Type: {type(run_allocation)}") 
+                # REVERTED: Always use the actual current week for allocation action
+                run_time_now = datetime.now(OFFICE_TIMEZONE)
+                action_week_monday = run_time_now.date() - timedelta(days=run_time_now.date().weekday())
                 
-                allocated_week_monday = st.session_state.project_rooms_display_monday
-                st.write(f"Debug: Allocated week monday from session state: {allocated_week_monday} (Type: {type(allocated_week_monday)})") 
-                
-                if not isinstance(allocated_week_monday, date): # Ensure it's a date object
-                    st.error(f"Debug: Error - allocated_week_monday is not a date object! Value: {allocated_week_monday}")
+                success, message = run_allocation(DATABASE_URL, allocated_week_monday=action_week_monday, only="project")
+
+                if success:
+                    # Force display and URL to the week that was just processed
+                    st.session_state.project_rooms_display_monday = action_week_monday
+                    st.session_state["submission_week_of_text"] = action_week_monday.strftime("%-d %B")
+                    st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {action_week_monday.strftime('%-d %B %Y')}."
+                    st.query_params["proj_date"] = action_week_monday.strftime("%Y-%m-%d")
+                    
+                    st.success(f"✅ Project room allocation completed for CURRENT week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    st.rerun()
                 else:
-                    success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="project")
-                    st.write(f"Debug: run_allocation returned success={success}, message='{message}'") 
-
-                    if success:
-                        st.write("Debug: run_allocation was successful. Updating state and query params.") 
-                        try:
-                            st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
-                            st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                            
-                            st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                            st.write(f"Debug: Query param 'proj_date' set to {allocated_week_monday.strftime('%Y-%m-%d')}")
-
-                            st.success(f"✅ Project room allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
-                            st.write("Debug: About to rerun.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Debug: Error during success block: {e}")
-                    else:
-                        st.error(f"❌ Project room allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    st.error(f"❌ Project room allocation failed for CURRENT week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
-                st.error("Debug: run_allocation function not available or not callable. Please ensure allocate_rooms.py is correctly set up if used, or the placeholder is defined.")
-
+                st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
 
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
-            st.write("Debug: 'Run Oasis Allocation' button clicked.") # DEBUG
             if 'run_allocation' in globals() and callable(run_allocation):
-                st.write(f"Debug: run_allocation function found. Type: {type(run_allocation)}") # DEBUG
-                allocated_week_monday = st.session_state.oasis_display_monday
-                st.write(f"Debug: Allocated week monday (Oasis) from session state: {allocated_week_monday} (Type: {type(allocated_week_monday)})") # DEBUG
+                # REVERTED: Always use the actual current week for allocation action
+                run_time_now = datetime.now(OFFICE_TIMEZONE)
+                action_week_monday = run_time_now.date() - timedelta(days=run_time_now.date().weekday())
 
-                if not isinstance(allocated_week_monday, date): # Ensure it's a date object
-                    st.error(f"Debug: Error - allocated_week_monday (Oasis) is not a date object! Value: {allocated_week_monday}")
+                success, message = run_allocation(DATABASE_URL, allocated_week_monday=action_week_monday, only="oasis")
+
+                if success:
+                    # Force display and URL to the week that was just processed
+                    st.session_state.oasis_display_monday = action_week_monday
+                    st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {action_week_monday.strftime('%-d %B %Y')}."
+                    st.query_params["oasis_date"] = action_week_monday.strftime("%Y-%m-%d")
+
+                    st.success(f"✅ Oasis allocation completed for CURRENT week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    st.rerun()
                 else:
-                    success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="oasis")
-                    st.write(f"Debug: run_allocation (Oasis) returned success={success}, message='{message}'") # DEBUG
-
-                    if success:
-                        st.write("Debug: run_allocation (Oasis) was successful. Updating state and query params.") # DEBUG
-                        try:
-                            st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                            st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
-                            st.write(f"Debug: Query param 'oasis_date' set to {allocated_week_monday.strftime('%Y-%m-%d')}") # DEBUG
-                            st.success(f"✅ Oasis allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
-                            st.write("Debug: About to rerun (Oasis).") # DEBUG
-                            st.rerun()
-                        except Exception as e:
-                             st.error(f"Debug: Error during Oasis success block: {e}") # DEBUG
-                    else:
-                        st.error(f"❌ Oasis allocation failed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
+                    st.error(f"❌ Oasis allocation failed for CURRENT week of {action_week_monday.strftime('%Y-%m-%d')}. {message}")
             else:
-                st.error("Debug: run_allocation function not available or not callable (Oasis).")
-
+                st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
 
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
@@ -662,7 +637,7 @@ with st.form("oasis_form_main"):
 # -----------------------------------------------------
 st.header("📌 Project Room Allocations")
 st.markdown(st.session_state.get('project_allocations_display_markdown_content', default_project_alloc_markdown))
-# Ensure project_rooms_display_monday is a date object before passing to get_room_grid
+
 if isinstance(st.session_state.project_rooms_display_monday, date):
     alloc_display_df = get_room_grid(pool, st.session_state.project_rooms_display_monday)
     if alloc_display_df.empty:
@@ -678,59 +653,63 @@ else:
 # -----------------------------------------------------
 st.header("🚶 Add Yourself to Oasis (Ad-hoc)")
 current_oasis_display_mon_adhoc = st.session_state.oasis_display_monday
-st.caption(f"Use this if you missed preference submission. Subject to availability for week of {current_oasis_display_mon_adhoc.strftime('%d %B %Y')}.")
-with st.form("oasis_add_form_main"):
-    adhoc_oasis_name = st.text_input("Your Name", key="af_adhoc_name")
-    adhoc_oasis_days = st.multiselect(
-        f"Select day(s) for week starting {current_oasis_display_mon_adhoc.strftime('%d %B')}:",
-        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        key="af_adhoc_days"
-    )
-    add_adhoc_submit = st.form_submit_button("➕ Add Me to Oasis Schedule")
+if isinstance(current_oasis_display_mon_adhoc, date): # Check if it's a date
+    st.caption(f"Use this if you missed preference submission. Subject to availability for week of {current_oasis_display_mon_adhoc.strftime('%d %B %Y')}.")
+    with st.form("oasis_add_form_main"):
+        adhoc_oasis_name = st.text_input("Your Name", key="af_adhoc_name")
+        adhoc_oasis_days = st.multiselect(
+            f"Select day(s) for week starting {current_oasis_display_mon_adhoc.strftime('%d %B')}:",
+            ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            key="af_adhoc_days"
+        )
+        add_adhoc_submit = st.form_submit_button("➕ Add Me to Oasis Schedule")
 
-    if add_adhoc_submit:
-        if not adhoc_oasis_name.strip(): st.error("❌ Please enter your name.")
-        elif not adhoc_oasis_days: st.error("❌ Select at least one day.")
-        else:
-            conn_adhoc = get_connection(pool)
-            if not conn_adhoc: st.error("No DB Connection")
+        if add_adhoc_submit:
+            if not adhoc_oasis_name.strip(): st.error("❌ Please enter your name.")
+            elif not adhoc_oasis_days: st.error("❌ Select at least one day.")
             else:
-                try:
-                    with conn_adhoc.cursor() as cur:
-                        name_clean = adhoc_oasis_name.strip().title()
-                        days_map_indices = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4}
-                        
-                        for day_str in adhoc_oasis_days:
-                            date_obj_check = current_oasis_display_mon_adhoc + timedelta(days=days_map_indices[day_str])
-                            cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = %s AND date = %s", (name_clean, date_obj_check))
-                        
-                        added_to_all_selected = True
-                        actually_added_days = []
-                        for day_str in adhoc_oasis_days:
-                            date_obj = current_oasis_display_mon_adhoc + timedelta(days=days_map_indices[day_str])
-                            cur.execute("SELECT COUNT(*) FROM weekly_allocations WHERE room_name = 'Oasis' AND date = %s", (date_obj,))
-                            count_result = cur.fetchone()
-                            count = count_result[0] if count_result else 0
+                conn_adhoc = get_connection(pool)
+                if not conn_adhoc: st.error("No DB Connection")
+                else:
+                    try:
+                        with conn_adhoc.cursor() as cur:
+                            name_clean = adhoc_oasis_name.strip().title()
+                            days_map_indices = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4}
+                            
+                            for day_str in adhoc_oasis_days:
+                                date_obj_check = current_oasis_display_mon_adhoc + timedelta(days=days_map_indices[day_str])
+                                cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = %s AND date = %s", (name_clean, date_obj_check))
+                            
+                            added_to_all_selected = True
+                            actually_added_days = []
+                            for day_str in adhoc_oasis_days:
+                                date_obj = current_oasis_display_mon_adhoc + timedelta(days=days_map_indices[day_str])
+                                cur.execute("SELECT COUNT(*) FROM weekly_allocations WHERE room_name = 'Oasis' AND date = %s", (date_obj,))
+                                count_result = cur.fetchone()
+                                count = count_result[0] if count_result else 0
 
-                            if count >= oasis.get("capacity", 15):
-                                st.warning(f"⚠️ Oasis is full on {day_str} ({date_obj.strftime('%d %B')}). Could not add {name_clean}.")
-                                added_to_all_selected = False
-                            else:
-                                cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, 'Oasis', %s)", (name_clean, date_obj))
-                                actually_added_days.append(day_str)
-                        conn_adhoc.commit()
-                        if actually_added_days:
-                             st.success(f"✅ {name_clean} processed for Oasis for {', '.join(actually_added_days)} in week of {current_oasis_display_mon_adhoc.strftime('%d %B')}!")
-                        if not added_to_all_selected and adhoc_oasis_days :
-                             st.info("ℹ️ Check messages above for details on your ad-hoc Oasis additions. Some days might have been full.")
-                        elif not actually_added_days and adhoc_oasis_days:
-                             st.error("❌ Could not add to Oasis for any selected day (likely full).")
+                                if count >= oasis.get("capacity", 15):
+                                    st.warning(f"⚠️ Oasis is full on {day_str} ({date_obj.strftime('%d %B')}). Could not add {name_clean}.")
+                                    added_to_all_selected = False
+                                else:
+                                    cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, 'Oasis', %s)", (name_clean, date_obj))
+                                    actually_added_days.append(day_str)
+                            conn_adhoc.commit()
+                            if actually_added_days:
+                                 st.success(f"✅ {name_clean} processed for Oasis for {', '.join(actually_added_days)} in week of {current_oasis_display_mon_adhoc.strftime('%d %B')}!")
+                            if not added_to_all_selected and adhoc_oasis_days :
+                                 st.info("ℹ️ Check messages above for details on your ad-hoc Oasis additions. Some days might have been full.")
+                            elif not actually_added_days and adhoc_oasis_days:
+                                 st.error("❌ Could not add to Oasis for any selected day (likely full).")
 
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error adding to Oasis: {e}")
-                    if conn_adhoc: conn_adhoc.rollback()
-                finally: return_connection(pool, conn_adhoc)
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error adding to Oasis: {e}")
+                        if conn_adhoc: conn_adhoc.rollback()
+                    finally: return_connection(pool, conn_adhoc)
+else:
+    st.error("Error: Ad-hoc Oasis display date is not configured correctly.")
+
 
 # -----------------------------------------------------
 # Full Weekly Oasis Overview
@@ -739,7 +718,7 @@ st.header("📊 Full Weekly Oasis Overview")
 st.markdown(st.session_state.get('oasis_allocations_display_markdown_content', default_oasis_alloc_markdown))
 oasis_overview_monday_display = st.session_state.oasis_display_monday
 
-if isinstance(oasis_overview_monday_display, date): # Ensure it's a date
+if isinstance(oasis_overview_monday_display, date):
     oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
     oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
     oasis_capacity = oasis.get("capacity", 15)
