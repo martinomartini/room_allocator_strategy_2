@@ -123,7 +123,7 @@ if "oasis_allocations_display_markdown_content" not in st.session_state or parse
 # -----------------------------------------------------
 # Database Utility Functions
 # -----------------------------------------------------
-def get_room_grid(pool, display_monday: date):
+def get_room_grid(pool, display_monday: date): # CORRECTED FUNCTION
     if not pool: return pd.DataFrame()
     this_monday = display_monday
     day_mapping = {
@@ -131,18 +131,26 @@ def get_room_grid(pool, display_monday: date):
         this_monday + timedelta(days=2): "Wednesday", this_monday + timedelta(days=3): "Thursday"
     }
     day_labels = list(day_mapping.values())
+    expected_columns = ["Room"] + day_labels 
+
     try:
-        with open(ROOMS_FILE, 'r') as f: all_rooms = [r["name"] for r in json.load(f) if r["name"] != "Oasis"]
+        with open(ROOMS_FILE, 'r') as f: 
+            all_rooms = [r["name"] for r in json.load(f) if r["name"] != "Oasis"]
     except (FileNotFoundError, json.JSONDecodeError):
         st.error(f"Error: Could not load valid data from {ROOMS_FILE}.")
-        return pd.DataFrame(columns=["Room"] + day_labels)
+        return pd.DataFrame(columns=expected_columns)
     
     grid = {room: {**{"Room": room}, **{day: "Vacant" for day in day_labels}} for room in all_rooms}
     if not all_rooms: 
-        return pd.DataFrame(columns=["Room"] + day_labels)
+        return pd.DataFrame(columns=expected_columns)
 
     conn = get_connection(pool)
-    if not conn: return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels) #MODIFIED
+    if not conn: 
+        if grid:
+            return pd.DataFrame(list(grid.values()))
+        else: # Should not happen if all_rooms was not empty, but as a safeguard
+            return pd.DataFrame(columns=expected_columns)
+            
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             start_date, end_date = this_monday, this_monday + timedelta(days=3)
@@ -162,7 +170,10 @@ def get_room_grid(pool, display_monday: date):
         return pd.DataFrame(list(grid.values()))
     except psycopg2.Error as e:
         st.warning(f"Database error while getting room grid: {e}")
-        return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels) #MODIFIED
+        if grid:
+            return pd.DataFrame(list(grid.values()))
+        else:
+            return pd.DataFrame(columns=expected_columns)
     finally: return_connection(pool, conn)
 
 def get_preferences(pool):
@@ -287,7 +298,7 @@ with st.expander("🔐 Admin Controls"):
         st.success("✅ Access granted.")
 
         st.subheader("💼 Update Configurable Texts (for Submission Forms & General Info)")
-        # ... (configurable text inputs remain the same) ...
+        
         current_s_week_of_text = st.session_state.get("submission_week_of_text", default_submission_week_of_text)
         new_submission_week_of_text = st.text_input(
             "Text for 'Submissions for the week of ...' (e.g., '9 June')",
@@ -369,17 +380,13 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
             if 'run_allocation' in globals() and callable(run_allocation):
-                # MODIFIED: Use the currently displayed project week for allocation
                 allocated_week_monday = st.session_state.project_rooms_display_monday
                 
                 success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="project")
 
                 if success:
-                    # The display is already set to this week, so no need to change session_state for dates.
-                    # Update markdown and submission text to be sure they reflect the processed week.
                     st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
                     st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Ensure URL reflects the week processed, if it changed (though it shouldn't in this flow)
                     st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
                     st.success(f"✅ Project room allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
                     st.rerun()
@@ -391,14 +398,12 @@ with st.expander("🔐 Admin Controls"):
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
             if 'run_allocation' in globals() and callable(run_allocation):
-                # MODIFIED: Use the currently displayed oasis week for allocation
                 allocated_week_monday = st.session_state.oasis_display_monday
 
                 success, message = run_allocation(DATABASE_URL, allocated_week_monday=allocated_week_monday, only="oasis")
 
                 if success:
                     st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Ensure URL reflects the week processed
                     st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
                     st.success(f"✅ Oasis allocation completed for week of {allocated_week_monday.strftime('%Y-%m-%d')}. {message}")
                     st.rerun()
@@ -407,7 +412,6 @@ with st.expander("🔐 Admin Controls"):
             else:
                 st.error("run_allocation function not available. Please ensure allocate_rooms.py is correctly set up if used.")
 
-        # ... (Rest of the admin controls: Admin Edit, Resets remain largely the same) ...
         st.subheader("📌 Project Room Allocations (Admin Edit)")
         try:
             current_proj_display_mon = st.session_state.project_rooms_display_monday
