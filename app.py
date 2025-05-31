@@ -70,9 +70,9 @@ pool = get_db_connection_pool()
 # Helper to load/update display dates and UI texts
 # -----------------------------------------------------
 
-query_params = st.experimental_get_query_params()
-initial_proj_date_str = query_params.get("proj_date", [None])[0]
-initial_oasis_date_str = query_params.get("oasis_date", [None])[0]
+# Get dates from URL query parameters first using the new API
+initial_proj_date_str = st.query_params.get("proj_date")
+initial_oasis_date_str = st.query_params.get("oasis_date")
 
 parsed_proj_date = None
 if initial_proj_date_str:
@@ -135,7 +135,7 @@ def get_room_grid(pool, display_monday: date):
         return pd.DataFrame(columns=["Room"] + day_labels)
     
     grid = {room: {**{"Room": room}, **{day: "Vacant" for day in day_labels}} for room in all_rooms}
-    if not all_rooms: # If all_rooms is empty, grid will be empty, return empty DataFrame with columns
+    if not all_rooms: 
         return pd.DataFrame(columns=["Room"] + day_labels)
 
     conn = get_connection(pool)
@@ -209,9 +209,9 @@ def insert_preference(pool, team, contact, size, days):
             if cur.fetchone():
                 st.error(f"❌ Team '{team}' has already submitted a preference. Contact admin to change.")
                 return False
-            new_days_set = set(days.split(',')) # Line 156 in typical full script
+            new_days_set = set(days.split(',')) 
             valid_pairs = [set(["Monday", "Wednesday"]), set(["Tuesday", "Thursday"])]
-            if new_days_set not in valid_pairs: # Line 159 in typical full script
+            if new_days_set not in valid_pairs: 
                 st.error("❌ Invalid day selection. Must select Monday & Wednesday or Tuesday & Thursday.")
                 return False
             cur.execute(
@@ -376,10 +376,11 @@ with st.expander("🔐 Admin Controls"):
             st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {final_oasis_monday.strftime('%-d %B %Y')}."
             st.session_state["submission_week_of_text"] = final_project_monday.strftime("%-d %B")
             
-            st.experimental_set_query_params(
-                proj_date=final_project_monday.strftime("%Y-%m-%d"),
-                oasis_date=final_oasis_monday.strftime("%Y-%m-%d")
-            )
+            # Set both query parameters, replacing any existing ones
+            st.query_params = {
+                "proj_date": final_project_monday.strftime("%Y-%m-%d"),
+                "oasis_date": final_oasis_monday.strftime("%Y-%m-%d")
+            }
             st.success(f"Display weeks set in URL. Project rooms: {final_project_monday.strftime('%Y-%m-%d')}, Oasis: {final_oasis_monday.strftime('%Y-%m-%d')}. Page will now refresh.")
             st.rerun()
 
@@ -395,7 +396,8 @@ with st.expander("🔐 Admin Controls"):
                     st.session_state.project_rooms_display_monday = allocated_week_monday
                     st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
                     st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    st.experimental_set_query_params(proj_date=allocated_week_monday.strftime("%Y-%m-%d"))
+                    # Update only proj_date in query params, leave others
+                    st.query_params["proj_date"] = allocated_week_monday.strftime("%Y-%m-%d")
                     st.success(f"✅ Project room allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
                 else:
@@ -414,7 +416,8 @@ with st.expander("🔐 Admin Controls"):
                 if success:
                     st.session_state.oasis_display_monday = allocated_week_monday
                     st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    st.experimental_set_query_params(oasis_date=allocated_week_monday.strftime("%Y-%m-%d"))
+                    # Update only oasis_date in query params, leave others
+                    st.query_params["oasis_date"] = allocated_week_monday.strftime("%Y-%m-%d")
                     st.success(f"✅ Oasis allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
                 else:
