@@ -133,10 +133,10 @@ def get_room_grid(pool, display_monday: date):
         with open(ROOMS_FILE) as f: all_rooms = [r["name"] for r in json.load(f) if r["name"] != "Oasis"]
     except (FileNotFoundError, json.JSONDecodeError):
         st.error(f"Error: Could not load valid data from {ROOMS_FILE}.")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=["Room"] + day_labels) # Return empty df with expected columns
     grid = {room: {**{"Room": room}, **{day: "Vacant" for day in day_labels}} for room in all_rooms}
     conn = get_connection(pool)
-    if not conn: return pd.DataFrame(list(grid.values())) # Ensure it returns a DataFrame even if grid is empty or conn fails
+    if not conn: return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels)
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             start_date, end_date = this_monday, this_monday + timedelta(days=3)
@@ -153,10 +153,10 @@ def get_room_grid(pool, display_monday: date):
             if room not in grid or not day: continue
             contact = contacts.get(team)
             grid[room][day] = f"{team} ({contact})" if contact else team
-        return pd.DataFrame(list(grid.values()))
+        return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels)
     except psycopg2.Error as e:
         st.warning(f"Database error while getting room grid: {e}")
-        return pd.DataFrame(list(grid.values()))
+        return pd.DataFrame(list(grid.values()) if grid else columns=["Room"] + day_labels)
     finally: return_connection(pool, conn)
 
 def get_preferences(pool):
@@ -206,7 +206,7 @@ def insert_preference(pool, team, contact, size, days):
             if cur.fetchone():
                 st.error(f"❌ Team '{team}' has already submitted a preference. Contact admin to change.")
                 return False
-            new_days_set = set(days.split(','))
+            new_days_set = set(days.split(',')) # Assuming days is "Monday,Wednesday"
             valid_pairs = [set(["Monday", "Wednesday"]), set(["Tuesday", "Thursday"])]
             if new_days_set not in valid_pairs:
                 st.error("❌ Invalid day selection. Must select Monday & Wednesday or Tuesday & Thursday.")
@@ -302,9 +302,6 @@ with st.expander("🔐 Admin Controls"):
         st.success("✅ Access granted.")
 
         st.subheader("💼 Update Configurable Texts (for Submission Forms & General Info)")
-        # These texts are now primarily driven by the display dates, but can be overridden if needed.
-        # For simplicity, direct editing of markdown content is kept.
-        # Consider if these should be auto-generated based on display dates or fully manual.
         
         current_s_week_of_text = st.session_state.get("submission_week_of_text", default_submission_week_of_text)
         new_submission_week_of_text = st.text_input(
@@ -329,14 +326,14 @@ with st.expander("🔐 Admin Controls"):
         )
         
         current_proj_alloc_md = st.session_state.get("project_allocations_display_markdown_content", default_project_alloc_markdown)
-        new_project_alloc_display_markdown = st.text_area( # Changed to text_area for more space
+        new_project_alloc_display_markdown = st.text_area(
             "Text for 'Project Room Allocations' section header (can override auto-text)",
             current_proj_alloc_md,
             key="conf_proj_alloc_header"
         )
         
         current_oasis_alloc_md = st.session_state.get("oasis_allocations_display_markdown_content", default_oasis_alloc_markdown)
-        new_oasis_alloc_display_markdown = st.text_area( # Changed to text_area
+        new_oasis_alloc_display_markdown = st.text_area(
             "Text for 'Oasis Allocations' section header (can override auto-text)",
             current_oasis_alloc_md,
             key="conf_oasis_alloc_header"
@@ -352,17 +349,16 @@ with st.expander("🔐 Admin Controls"):
             st.success("All configurable texts updated!")
             st.rerun()
 
-        # SECTION FOR SETTING DISPLAY DATES (Persists via URL)
         st.subheader("🗓️ Set Display Dates (Persists in URL)")
         admin_selected_project_display_date = st.date_input(
             "Set Project Rooms Display Week Starting Monday:",
-            value=st.session_state.project_rooms_display_monday, # Default to current session state
+            value=st.session_state.project_rooms_display_monday,
             help="Select any date; it will be adjusted to Monday. This will update the URL.",
             key="admin_set_project_display_date_url"
         )
         admin_selected_oasis_display_date = st.date_input(
             "Set Oasis Display Week Starting Monday:",
-            value=st.session_state.oasis_display_monday, # Default to current session state
+            value=st.session_state.oasis_display_monday,
             help="Select any date; it will be adjusted to Monday. This will update the URL.",
             key="admin_set_oasis_display_date_url"
         )
@@ -371,29 +367,22 @@ with st.expander("🔐 Admin Controls"):
             final_project_monday = admin_selected_project_display_date - timedelta(days=admin_selected_project_display_date.weekday())
             final_oasis_monday = admin_selected_oasis_display_date - timedelta(days=admin_selected_oasis_display_date.weekday())
 
-            # Update session state immediately for current view before rerun
             st.session_state.project_rooms_display_monday = final_project_monday
             st.session_state.oasis_display_monday = final_oasis_monday
             st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {final_project_monday.strftime('%-d %B %Y')}."
             st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {final_oasis_monday.strftime('%-d %B %Y')}."
             st.session_state["submission_week_of_text"] = final_project_monday.strftime("%-d %B")
-
-            # Set query parameters to make it persist across refreshes/new sessions
+            
             st.experimental_set_query_params(
                 proj_date=final_project_monday.strftime("%Y-%m-%d"),
                 oasis_date=final_oasis_monday.strftime("%Y-%m-%d")
             )
-            st.success(f"Display weeks set in URL. Project rooms: {final_project_monday.strftime('%Y-%m-%d')}, Oasis: {final_oasis_monday.strftime('%Y-%m-%d')}. Page will now refresh with these settings.")
-            # Rerun is implicitly handled by set_query_params in some Streamlit versions,
-            # but an explicit st.rerun() can be added if needed, though it might cause a double rerun.
-            # Forcing a clear visual cue that parameters are set.
-            # A full page reload might be better: st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True) if st.rerun is not enough
-            st.rerun() # Rerun to make sure all components use the new session state derived from URL
-        # END OF URL-PERSISTENT DISPLAY DATE SECTION
+            st.success(f"Display weeks set in URL. Project rooms: {final_project_monday.strftime('%Y-%m-%d')}, Oasis: {final_oasis_monday.strftime('%Y-%m-%d')}. Page will now refresh.")
+            st.rerun()
 
         st.subheader("🧠 Project Room Admin")
         if st.button("🚀 Run Project Room Allocation", key="btn_run_proj_alloc"):
-            if run_allocation:
+            if run_allocation: # Check if function is available
                 allocation_run_time = datetime.now(OFFICE_TIMEZONE)
                 allocated_week_monday = allocation_run_time.date() - timedelta(days=allocation_run_time.date().weekday())
                 
@@ -403,7 +392,6 @@ with st.expander("🔐 Admin Controls"):
                     st.session_state.project_rooms_display_monday = allocated_week_monday
                     st.session_state["submission_week_of_text"] = allocated_week_monday.strftime("%-d %B")
                     st.session_state["project_allocations_display_markdown_content"] = f"Displaying project rooms for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Also update URL to reflect this operational change
                     st.experimental_set_query_params(proj_date=allocated_week_monday.strftime("%Y-%m-%d"))
                     st.success(f"✅ Project room allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
@@ -414,7 +402,7 @@ with st.expander("🔐 Admin Controls"):
 
         st.subheader("🌿 Oasis Admin")
         if st.button("🎲 Run Oasis Allocation", key="btn_run_oasis_alloc"):
-            if run_allocation:
+            if run_allocation: # Check if function is available
                 allocation_run_time = datetime.now(OFFICE_TIMEZONE)
                 allocated_week_monday = allocation_run_time.date() - timedelta(days=allocation_run_time.date().weekday())
 
@@ -423,7 +411,6 @@ with st.expander("🔐 Admin Controls"):
                 if success:
                     st.session_state.oasis_display_monday = allocated_week_monday
                     st.session_state["oasis_allocations_display_markdown_content"] = f"Displaying Oasis for the week of {allocated_week_monday.strftime('%-d %B %Y')}."
-                    # Also update URL
                     st.experimental_set_query_params(oasis_date=allocated_week_monday.strftime("%Y-%m-%d"))
                     st.success(f"✅ Oasis allocation completed. Display updated to week of {allocated_week_monday.strftime('%Y-%m-%d')}.")
                     st.rerun()
@@ -445,7 +432,7 @@ with st.expander("🔐 Admin Controls"):
                         try:
                             with conn_admin_alloc.cursor() as cur:
                                 week_start_date = current_proj_display_mon
-                                week_end_date = current_proj_display_mon + timedelta(days=3) # Mon-Thu
+                                week_end_date = current_proj_display_mon + timedelta(days=3)
                                 cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis' AND date >= %s AND date <= %s", (week_start_date, week_end_date))
                                 day_indices = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3}
                                 for _, row in editable_alloc_proj.iterrows():
@@ -479,7 +466,7 @@ with st.expander("🔐 Admin Controls"):
                 try:
                     with conn_reset_pra.cursor() as cur:
                         mon_to_reset = st.session_state.project_rooms_display_monday
-                        cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=3))) # Mon-Thu
+                        cur.execute("DELETE FROM weekly_allocations WHERE room_name != 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=3)))
                         conn_reset_pra.commit()
                         st.success(f"✅ Project room allocations (non-Oasis) removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
                         st.rerun()
@@ -487,12 +474,13 @@ with st.expander("🔐 Admin Controls"):
                 finally: return_connection(pool, conn_reset_pra)
 
         if st.button("🧽 Remove All Project Room Preferences (Global Action)", key="btn_reset_all_proj_prefs_confirmable"):
-            st.session_state.confirm_prp_reset = True
+            st.session_state.confirm_prp_reset = True # Trigger confirmation display
+        
         if st.session_state.get("confirm_prp_reset"):
             st.warning("⚠️ Are you sure you want to remove ALL project room preferences? This cannot be undone.")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("YES, DELETE ALL PROJECT PREFERENCES", key="btn_confirm_delete_prp_yes")):
+            col1_prp, col2_prp = st.columns(2)
+            with col1_prp:
+                if st.button("YES, DELETE ALL PROJECT PREFERENCES", key="btn_confirm_delete_prp_yes"): # CORRECTED LINE
                     conn_reset_prp = get_connection(pool)
                     if conn_reset_prp:
                         try:
@@ -500,12 +488,12 @@ with st.expander("🔐 Admin Controls"):
                                 cur.execute("DELETE FROM weekly_preferences")
                                 conn_reset_prp.commit()
                                 st.success("✅ All project room preferences removed.")
-                                st.session_state.confirm_prp_reset = False # Reset confirmation
+                                st.session_state.confirm_prp_reset = False 
                                 st.rerun()
                         except Exception as e: st.error(f"❌ Failed: {e}"); conn_reset_prp.rollback()
                         finally: return_connection(pool, conn_reset_prp)
-            with col2:
-                if st.button("NO, CANCEL", key="btn_confirm_delete_prp_no")):
+            with col2_prp:
+                if st.button("NO, CANCEL PROJECT PREFERENCES DELETION", key="btn_confirm_delete_prp_no")):
                     st.session_state.confirm_prp_reset = False
                     st.rerun()
 
@@ -518,7 +506,7 @@ with st.expander("🔐 Admin Controls"):
                 try:
                     with conn_reset_oa.cursor() as cur:
                         mon_to_reset = st.session_state.oasis_display_monday
-                        cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=4))) # Mon-Fri
+                        cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s", (mon_to_reset, mon_to_reset + timedelta(days=4)))
                         conn_reset_oa.commit()
                         st.success(f"✅ Oasis allocations removed for week of {mon_to_reset.strftime('%Y-%m-%d')}.")
                         st.rerun()
@@ -526,7 +514,8 @@ with st.expander("🔐 Admin Controls"):
                 finally: return_connection(pool, conn_reset_oa)
         
         if st.button("🧽 Remove All Oasis Preferences (Global Action)", key="btn_reset_all_oasis_prefs_confirmable"):
-            st.session_state.confirm_op_reset = True
+            st.session_state.confirm_op_reset = True # Trigger confirmation
+        
         if st.session_state.get("confirm_op_reset"):
             st.warning("⚠️ Are you sure you want to remove ALL Oasis preferences? This cannot be undone.")
             col1_op, col2_op = st.columns(2)
@@ -539,12 +528,12 @@ with st.expander("🔐 Admin Controls"):
                                 cur.execute("DELETE FROM oasis_preferences")
                                 conn_reset_op.commit()
                                 st.success("✅ All Oasis preferences removed.")
-                                st.session_state.confirm_op_reset = False # Reset
+                                st.session_state.confirm_op_reset = False
                                 st.rerun()
                         except Exception as e: st.error(f"❌ Failed: {e}"); conn_reset_op.rollback()
                         finally: return_connection(pool, conn_reset_op)
             with col2_op:
-                if st.button("NO, CANCEL", key="btn_confirm_delete_op_no")):
+                if st.button("NO, CANCEL OASIS PREFERENCES DELETION", key="btn_confirm_delete_op_no")):
                     st.session_state.confirm_op_reset = False
                     st.rerun()
 
@@ -721,7 +710,7 @@ with st.form("oasis_add_form_main"):
 st.header("📊 Full Weekly Oasis Overview")
 st.markdown(st.session_state.get('oasis_allocations_display_markdown_content', default_oasis_alloc_markdown))
 oasis_overview_monday_display = st.session_state.oasis_display_monday
-oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)] # Mon-Fri
+oasis_overview_days_dates = [oasis_overview_monday_display + timedelta(days=i) for i in range(5)]
 oasis_overview_day_names = [d.strftime("%A") for d in oasis_overview_days_dates]
 oasis_capacity = oasis.get("capacity", 15)
 
@@ -729,51 +718,51 @@ conn_matrix = get_connection(pool)
 if not conn_matrix: st.error("No DB connection for Oasis Overview")
 else:
     try:
-        with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur: # Use RealDictCursor for easier column access
-            cur.execute(
+        with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute( 
                 "SELECT team_name, date FROM weekly_allocations WHERE room_name = 'Oasis' AND date >= %s AND date <= %s",
                 (oasis_overview_monday_display, oasis_overview_days_dates[-1])
             )
             rows = cur.fetchall()
 
-        df_matrix_data = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["team_name", "date"]) # Use dict keys
+        df_matrix_data = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["team_name", "date"])
         if not df_matrix_data.empty:
-            df_matrix_data["date"] = pd.to_datetime(df_matrix_data["date"]).dt.date # Ensure column name matches
+            df_matrix_data["date"] = pd.to_datetime(df_matrix_data["date"]).dt.date
 
-        unique_names_allocated = set(df_matrix_data["team_name"]) if not df_matrix_data.empty else set() # Use dict key
+        unique_names_allocated = set(df_matrix_data["team_name"]) if not df_matrix_data.empty else set()
         names_from_prefs = set()
-        try:
-            with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur:
+        try: 
+            with conn_matrix.cursor(cursor_factory=RealDictCursor) as cur: 
                 cur.execute("SELECT DISTINCT person_name FROM oasis_preferences")
                 pref_rows = cur.fetchall()
-                names_from_prefs = {row["person_name"] for row in pref_rows} # Use dict key
+                names_from_prefs = {row["person_name"] for row in pref_rows}
         except psycopg2.Error: st.warning("Could not fetch names from Oasis preferences for matrix display.")
         
         all_relevant_names_list = list(unique_names_allocated.union(names_from_prefs))
         if "Niek" not in all_relevant_names_list:
-             all_relevant_names_list.append("Niek")
-        all_relevant_names = sorted(all_relevant_names_list)
+             all_relevant_names_list.append("Niek") # Ensure Niek is always an option
+        all_relevant_names = sorted(list(set(all_relevant_names_list))) # Ensure uniqueness and sort
         
         if not all_relevant_names:
             initial_matrix_df = pd.DataFrame(columns=oasis_overview_day_names)
         else:
             initial_matrix_df = pd.DataFrame(False, index=all_relevant_names, columns=oasis_overview_day_names)
 
-            if not df_matrix_data.empty:
+            if not df_matrix_data.empty: 
                 for _, row_data in df_matrix_data.iterrows():
-                    person_name = row_data["team_name"] # Use dict key
-                    alloc_date = row_data["date"]      # Use dict key
+                    person_name = row_data["team_name"]
+                    alloc_date = row_data["date"]
                     if alloc_date in oasis_overview_days_dates and person_name in initial_matrix_df.index:
                         initial_matrix_df.at[person_name, alloc_date.strftime("%A")] = True
             
-            if "Niek" in initial_matrix_df.index:
+            if "Niek" in initial_matrix_df.index: 
                 for day_n in oasis_overview_day_names: initial_matrix_df.at["Niek", day_n] = True
         
         st.subheader("🪑 Oasis Availability Summary")
         current_day_alloc_counts = {day_dt: 0 for day_dt in oasis_overview_days_dates}
         if not df_matrix_data.empty:
             for day_dt_check in oasis_overview_days_dates:
-                current_day_alloc_counts[day_dt_check] = df_matrix_data[df_matrix_data["date"] == day_dt_check]["team_name"].nunique() # Use dict keys
+                current_day_alloc_counts[day_dt_check] = df_matrix_data[df_matrix_data["date"] == day_dt_check]["team_name"].nunique()
 
         for day_dt, day_str_label in zip(oasis_overview_days_dates, oasis_overview_day_names):
             used_spots = current_day_alloc_counts[day_dt]
@@ -782,9 +771,9 @@ else:
 
         if not initial_matrix_df.empty:
             edited_matrix = st.data_editor(
-                initial_matrix_df,
+                initial_matrix_df, 
                 use_container_width=True,
-                disabled=["Niek"] if "Niek" in initial_matrix_df.index else [],
+                disabled=["Niek"] if "Niek" in initial_matrix_df.index else [], 
                 key="oasis_matrix_editor_main"
             )
 
@@ -793,23 +782,22 @@ else:
                     with conn_matrix.cursor() as cur: # Standard cursor for DML
                         cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name != 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
                         
-                        if "Niek" in edited_matrix.index:
+                        if "Niek" in edited_matrix.index: 
                             cur.execute("DELETE FROM weekly_allocations WHERE room_name = 'Oasis' AND team_name = 'Niek' AND date >= %s AND date <= %s", (oasis_overview_monday_display, oasis_overview_days_dates[-1]))
                             for day_idx, day_col_name in enumerate(oasis_overview_day_names):
                                 if edited_matrix.at["Niek", day_col_name]:
                                     cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", ("Niek", "Oasis", oasis_overview_monday_display + timedelta(days=day_idx)))
                         
                         occupied_counts_per_day = {day_col: 0 for day_col in oasis_overview_day_names}
-                        if "Niek" in edited_matrix.index:
+                        if "Niek" in edited_matrix.index: 
                             for day_col_name in oasis_overview_day_names:
                                 if edited_matrix.at["Niek", day_col_name]:
                                     occupied_counts_per_day[day_col_name] +=1
                                     
-                        for person_name_matrix in edited_matrix.index:
-                            if person_name_matrix == "Niek": continue
-
+                        for person_name_matrix in edited_matrix.index: 
+                            if person_name_matrix == "Niek": continue 
                             for day_idx, day_col_name in enumerate(oasis_overview_day_names):
-                                if edited_matrix.at[person_name_matrix, day_col_name]:
+                                if edited_matrix.at[person_name_matrix, day_col_name]: 
                                     if occupied_counts_per_day[day_col_name] < oasis_capacity:
                                         alloc_date = oasis_overview_monday_display + timedelta(days=day_idx)
                                         cur.execute("INSERT INTO weekly_allocations (team_name, room_name, date) VALUES (%s, %s, %s)", (person_name_matrix, "Oasis", alloc_date))
