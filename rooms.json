@@ -1,7 +1,8 @@
 [
+  { "name": "Room D0204", "capacity": 6 },
   { "name": "Room D0287", "capacity": 4 },
   { "name": "Room D0284", "capacity": 4 },
   { "name": "Room D0285", "capacity": 4 },
   { "name": "Room D0286", "capacity": 4 },
-  { "name": "Oasis", "capacity": 20 }
+  { "name": "Oasis", "capacity": 16 }
 ]
