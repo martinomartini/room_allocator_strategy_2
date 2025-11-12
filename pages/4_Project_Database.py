@@ -21,6 +21,11 @@ DEFAULT_SUBSCRIPTION_KEY = "b82fef87872349b981d5c0d58afb55c1"
 DEFAULT_CHARGE_CODE = "1"
 DEFAULT_DEPLOYMENT = "gpt-4o-2024-08-06-dzs-we"
 
+def is_running_locally():
+    """Detect if the app is running locally vs on Streamlit Cloud"""
+    # Check if we're on Streamlit Cloud (they set this env variable)
+    return os.environ.get("STREAMLIT_SHARING_MODE") is None
+
 def get_api_config():
     """Get API configuration from secrets, environment variables, session state, or defaults"""
     # Initialize session state for API config if not exists
@@ -452,7 +457,10 @@ if df is not None and not df.empty:
     
     with tab1:
         st.subheader("💬 AI Chat Feature")
-        st.info("🤖 **AI-Powered Search:** Ask questions in natural language! API credentials are pre-configured. If you get an error, use the other tabs which always work.")
+        if is_running_locally():
+            st.success("🤖 **AI-Powered Search:** Ask questions in natural language! Running locally with KPMG network access.")
+        else:
+            st.warning("🤖 **AI Chat:** Requires KPMG network. Run locally (`streamlit run app.py`) to enable. Other tabs work perfectly!")
         st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
         # Initialize chat history
@@ -639,18 +647,41 @@ Please try again with a more specific query, or use the filter tabs below!"""
                                 "content": error_response
                             })
                     else:
-                        error_msg = """ℹ️ **AI Chat Not Available**
+                        # Check if running locally or on cloud
+                        if is_running_locally():
+                            error_msg = """⚠️ **AI Chat Connection Issue**
 
-The KPMG Workbench API cannot be reached from this environment (403 error).
+The KPMG Workbench API returned an error. This might be temporary.
 
-**✅ Good News - Everything Else Works:**
+**Troubleshooting:**
+- Check your VPN connection to KPMG network
+- Verify the API credentials are valid
+- Try refreshing the page
+
+**Meanwhile, use these working features:**
+- **Statistics** tab - View charts and metrics
+- **Industry** tab - Filter by sector
+- **Partner** tab - Browse by partner
+- **Manager** tab - Search by manager"""
+                        else:
+                            error_msg = """ℹ️ **AI Chat Not Available on Cloud**
+
+The KPMG Workbench API cannot be reached from Streamlit Cloud (requires KPMG network access).
+
+**💡 To use AI Chat:**
+Run this app **locally** on your KPMG machine:
+```bash
+streamlit run app.py
+```
+Then navigate to this page - AI chat will work!
+
+**✅ Everything Else Works Here:**
 - **Statistics** tab - View charts and metrics
 - **Industry** tab - Filter by sector
 - **Partner** tab - Browse by partner
 - **Manager** tab - Search by manager
-- Export and column selection features
-
-**Switch to another tab to continue exploring!**"""
+- Export and column selection features"""
+                        
                         message_placeholder.info(error_msg)
                         st.session_state.chat_messages.append({
                             "role": "assistant",
