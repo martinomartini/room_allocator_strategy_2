@@ -16,6 +16,7 @@ PyInstaller.__main__.run([
     '--name=ProjectDatabaseViewer',  # Name of the executable
     '--icon=NONE',  # You can add an icon later
     '--add-data=pages;pages',  # Include pages folder
+    '--add-data=app_standalone.py;.',  # Include standalone app
     '--add-data=credentials_full.xlsx;.',  # Include the Excel file
     '--add-data=.streamlit;.streamlit',  # Include streamlit config
     '--hidden-import=streamlit',

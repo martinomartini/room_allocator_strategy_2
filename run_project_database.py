@@ -30,11 +30,11 @@ if __name__ == '__main__':
     # Open browser in background
     Timer(2, open_browser).start()
     
-    # Run Streamlit
+    # Run Streamlit with standalone app
     sys.argv = [
         "streamlit",
         "run",
-        "app.py",
+        "app_standalone.py",
         "--server.headless=true",
         "--server.port=8501",
         "--browser.gatherUsageStats=false"
