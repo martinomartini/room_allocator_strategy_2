@@ -551,13 +551,14 @@ if df is not None and not df.empty:
             st.info("ℹ️ **AI Chat is disabled on Streamlit Cloud** - KPMG Workbench API is only accessible from KPMG network.\n\n**To use AI Chat:** Download and run locally (see instructions below)")
         
         # Show download section on BOTH cloud and local versions
-        with st.expander("📥 Download Standalone Package", expanded=not is_running_locally()):
+        with st.expander("📥 Download Standalone Package (Single Page Only)", expanded=not is_running_locally()):
             st.markdown("""
             ### Get the Standalone Application
             
-            Download this application to share with colleagues or run on other machines.
+            Download the **standalone version** with only the Project Database page (no other pages in sidebar).
             
             **What's included:**
+            - ✅ Only Project Database page (clean, no sidebar)
             - ✅ Full AI chat with natural language queries
             - ✅ All filter tabs and features
             - ✅ Simple double-click launcher
@@ -565,9 +566,10 @@ if df is not None and not df.empty:
             
             **How to use:**
             1. Click the download button below
-            2. Extract the ZIP file to your computer
-            3. Double-click `Launch_Project_Database.bat`
-            4. Browser opens automatically with full features!
+            2. Extract the ZIP file
+            3. **Go to the `standalone/` folder**
+            4. Double-click `Launch.bat`
+            5. Browser opens with single-page app!
             """)
             
             # GitHub repository download link
@@ -581,23 +583,25 @@ if df is not None and not df.empty:
                 use_container_width=True
             )
             
-            # Also provide direct file downloads
+            st.info("💡 **Important:** After extracting, navigate to the `standalone/` folder and use `Launch.bat` there for a clean single-page experience!")
+            
+            # Also provide direct file downloads from standalone folder
             st.markdown("---")
             st.markdown("**Or download individual files:**")
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
-                # Download BAT file
+                # Download standalone BAT file
                 try:
-                    bat_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Launch_Project_Database.bat")
+                    bat_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "standalone", "Launch.bat")
                     if os.path.exists(bat_file_path):
                         with open(bat_file_path, 'r') as f:
                             bat_content = f.read()
                         st.download_button(
-                            label="📄 Launch_Project_Database.bat",
+                            label="📄 Launch.bat",
                             data=bat_content,
-                            file_name="Launch_Project_Database.bat",
+                            file_name="Launch.bat",
                             mime="text/plain",
                             use_container_width=True
                         )
@@ -605,9 +609,26 @@ if df is not None and not df.empty:
                     pass
             
             with col2:
+                # Download standalone app.py
+                try:
+                    app_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "standalone", "app.py")
+                    if os.path.exists(app_path):
+                        with open(app_path, 'r', encoding='utf-8') as f:
+                            app_content = f.read()
+                        st.download_button(
+                            label="🐍 app.py",
+                            data=app_content,
+                            file_name="app.py",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                except:
+                    pass
+            
+            with col3:
                 # Download Excel file
                 try:
-                    excel_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "credentials_full.xlsx")
+                    excel_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "standalone", "credentials_full.xlsx")
                     if os.path.exists(excel_path):
                         with open(excel_path, 'rb') as f:
                             excel_content = f.read()
@@ -623,6 +644,24 @@ if df is not None and not df.empty:
             
             st.markdown("""
             ---
+            **Quick Start Guide:**
+            ```
+            1. Download and extract ZIP
+            2. Open the "standalone" folder
+            3. Double-click: Launch.bat
+            4. Enter password: bud123
+            5. Clean single-page app with AI Chat!
+            ```
+            
+            **Requirements:**
+            - Windows PC
+            - KPMG network access (VPN or on-premises) for AI Chat
+            - Python + Streamlit (if not installed: `pip install streamlit pandas openpyxl plotly requests`)
+            
+            **Share with colleagues:** Send them the standalone folder - it's completely self-contained!
+            """)
+        
+        st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
             **Quick Start Guide:**
             ```
             1. Extract all files to a folder
