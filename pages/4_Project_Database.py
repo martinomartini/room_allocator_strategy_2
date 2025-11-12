@@ -238,6 +238,23 @@ def export_to_excel(df: pd.DataFrame, filename: str = None) -> BytesIO:
 
 def call_workbench_api(user_query: str, context: str, df: pd.DataFrame, conversation_history: List[Dict] = None) -> Optional[str]:
     """Call the workbench API to interpret the user query"""
+    
+    # Check if we should use proxy (on Streamlit Cloud)
+    use_proxy = not is_running_locally()
+    
+    if use_proxy:
+        # Try to get proxy configuration from secrets
+        try:
+            proxy_url = st.secrets.get("PROXY_URL", "").strip()
+            proxy_token = st.secrets.get("PROXY_TOKEN", "").strip()
+            
+            if not proxy_url or not proxy_token:
+                # Proxy not configured - show helpful message
+                return None
+        except:
+            # Secrets not available
+            return None
+    
     # Get API config (always has default values)
     config = get_api_config()
     subscription_key = config.get("subscription_key", "").strip()
@@ -370,18 +387,55 @@ Return ONLY valid JSON, no other text."""
             "temperature": 0.3
         }
         
-        # Use persistent session instead of direct requests
-        session = get_persistent_session()
-        headers = get_api_headers()
+        # Choose endpoint based on environment
+        if use_proxy:
+            # Use proxy server when on Streamlit Cloud
+            endpoint_url = f"{proxy_url}/api/chat"
+            headers = {
+                'Authorization': f'Bearer {proxy_token}',
+                'Content-Type': 'application/json'
+            }
+            session = requests  # Use regular requests for proxy
+        else:
+            # Direct connection when running locally
+            endpoint_url = API_URL
+            headers = get_api_headers()
+            session = get_persistent_session()
         
-        # Perform the request using the session (maintains cookies, connection pooling)
+        # Perform the request
         response = session.post(
-            API_URL,
+            endpoint_url,
             headers=headers,
             json=body,
             timeout=30,
-            verify=True  # Ensure SSL verification
+            verify=True
         )
+        
+        # Debug logging
+        if response.status_code != 200:
+            # Store error details in session state for debugging
+            if 'api_debug' not in st.session_state:
+                st.session_state.api_debug = []
+            
+            error_info = {
+                'status_code': response.status_code,
+                'reason': response.reason,
+                'headers': dict(response.headers),
+                'body': response.text[:500] if response.text else 'No body',
+                'using_proxy': use_proxy
+            }
+            st.session_state.api_debug.append(error_info)
+            
+            # Show detailed error in expander
+            st.error(f"API returned status code: {response.status_code} - {response.reason}")
+            with st.expander("🔍 Debug Information (Click to expand)"):
+                st.write("**Using Proxy:**", "Yes (via local proxy server)" if use_proxy else "No (direct KPMG API)")
+                st.write("**Status Code:**", response.status_code)
+                st.write("**Reason:**", response.reason)
+                st.write("**Response Body (first 500 chars):**")
+                st.code(response.text[:500] if response.text else 'No response body')
+                st.write("**Response Headers:**")
+                st.json(dict(response.headers))
         
         if response.status_code == 200:
             result = response.json()
@@ -398,6 +452,10 @@ Return ONLY valid JSON, no other text."""
             
     except Exception as e:
         st.error(f"Error calling API: {str(e)}")
+        with st.expander("🔍 Exception Details"):
+            st.code(str(e))
+            import traceback
+            st.code(traceback.format_exc())
         return None
 
 def parse_api_response(response_text: str) -> Optional[Dict]:
