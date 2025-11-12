@@ -448,8 +448,9 @@ if df is not None and not df.empty:
     ])
     
     with tab1:
-        st.subheader("💬 Ask questions about projects")
-        st.caption("Use natural language to query projects. Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
+        st.subheader("💬 AI Chat (Optional Feature)")
+        st.warning("⚠️ **Note:** AI chat requires KPMG Workbench API access. If unavailable, use the **Statistics**, **Industry**, **Partner**, or **Manager** tabs instead - they work perfectly!")
+        st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
         # Initialize chat history
         if "chat_messages" not in st.session_state:
@@ -508,18 +509,18 @@ if df is not None and not df.empty:
                 subscription_key = config.get("subscription_key", "").strip()
                 
                 if not subscription_key:
-                    error_msg = """❌ **API Key Not Configured**
+                    error_msg = """ℹ️ **AI Chat Unavailable**
 
-Please configure your Workbench API credentials in the sidebar (⚙️ Configuration) to use the chat feature.
+The AI chat requires KPMG Workbench API access which is not configured.
 
-**To set up:**
-1. Open the sidebar and expand "⚙️ Configuration"
-2. Enter your **Subscription Key** in the API Configuration section
-3. Click "🔌 Test API Connection" to verify it works
-4. Try your query again
+**✅ All Other Features Work Great:**
+- Navigate to the **Statistics** tab for overview
+- Use **Industry**, **Partner**, or **Manager** tabs to filter projects
+- Export data to CSV or Excel
+- Select which columns to display
 
-**Alternative:** You can use the filter tabs below to browse projects without the API."""
-                    message_placeholder.error(error_msg)
+Click on the other tabs above to explore the database!"""
+                    message_placeholder.info(error_msg)
                     st.session_state.chat_messages.append({
                         "role": "assistant",
                         "content": error_msg,
@@ -635,18 +636,19 @@ Please try again with a more specific query, or use the filter tabs below!"""
                                 "content": error_response
                             })
                     else:
-                        error_msg = """❌ **API Connection Failed**
+                        error_msg = """ℹ️ **AI Chat Not Available**
 
-The API request failed. This could be due to:
-- **Invalid subscription key** - Please check your API key in the sidebar
-- **Network issues** - Please check your connection
-- **API service unavailable** - The Workbench API may be temporarily down
+The KPMG Workbench API cannot be reached from this environment (403 error).
 
-**What to do:**
-1. Check your API key in the sidebar (⚙️ Configuration)
-2. Click "🔌 Test API Connection" to verify your credentials
-3. Try again, or use the filter tabs below to browse projects"""
-                        message_placeholder.error(error_msg)
+**✅ Good News - Everything Else Works:**
+- **Statistics** tab - View charts and metrics
+- **Industry** tab - Filter by sector
+- **Partner** tab - Browse by partner
+- **Manager** tab - Search by manager
+- Export and column selection features
+
+**Switch to another tab to continue exploring!**"""
+                        message_placeholder.info(error_msg)
                         st.session_state.chat_messages.append({
                             "role": "assistant",
                             "content": error_msg,
