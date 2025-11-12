@@ -448,8 +448,8 @@ if df is not None and not df.empty:
     ])
     
     with tab1:
-        st.subheader("💬 AI Chat (Optional Feature)")
-        st.warning("⚠️ **Note:** AI chat requires KPMG Workbench API access. If unavailable, use the **Statistics**, **Industry**, **Partner**, or **Manager** tabs instead - they work perfectly!")
+        st.subheader("💬 AI Chat Feature")
+        st.info("🤖 **AI-Powered Search:** Ask questions in natural language! API credentials are pre-configured. If you get an error, use the other tabs which always work.")
         st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
         # Initialize chat history
