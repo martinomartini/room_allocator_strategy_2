@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import json
 from typing import Dict, List, Optional
 from io import BytesIO
@@ -20,6 +22,37 @@ API_URL = "https://api.workbench.kpmg/genai/azure/inference/chat/completions?api
 DEFAULT_SUBSCRIPTION_KEY = "b82fef87872349b981d5c0d58afb55c1"
 DEFAULT_CHARGE_CODE = "1"
 DEFAULT_DEPLOYMENT = "gpt-4o-2024-08-06-dzs-we"
+
+def get_persistent_session():
+    """Get or create a persistent requests session with browser-like behavior"""
+    if 'requests_session' not in st.session_state:
+        # Create a session with retry logic
+        session = requests.Session()
+        
+        # Configure retry strategy (like browsers do)
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        # Set default browser-like session settings
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive'
+        })
+        
+        st.session_state.requests_session = session
+    
+    return st.session_state.requests_session
 
 def is_running_locally():
     """Detect if the app is running locally vs on Streamlit Cloud"""
@@ -63,13 +96,28 @@ def get_api_config():
     return st.session_state.api_config
 
 def get_api_headers():
-    """Get API headers with current configuration"""
+    """Get API headers with current configuration - mimicking browser requests"""
     config = get_api_config()
     return {
+        # KPMG API specific headers
         'Ocp-Apim-Subscription-Key': config["subscription_key"],
-        'Cache-Control': 'no-cache',
         'x-kpmg-charge-code': config["charge_code"],
-        'azureml-model-deployment': config["deployment"]
+        'azureml-model-deployment': config["deployment"],
+        
+        # Browser-like headers to avoid detection/blocking
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+        'Origin': 'https://workbench.kpmg',
+        'Referer': 'https://workbench.kpmg/',
+        'Content-Type': 'application/json'
     }
 
 # Page configuration
@@ -322,12 +370,17 @@ Return ONLY valid JSON, no other text."""
             "temperature": 0.3
         }
         
+        # Use persistent session instead of direct requests
+        session = get_persistent_session()
         headers = get_api_headers()
-        response = requests.post(
+        
+        # Perform the request using the session (maintains cookies, connection pooling)
+        response = session.post(
             API_URL,
             headers=headers,
             json=body,
-            timeout=30
+            timeout=30,
+            verify=True  # Ensure SSL verification
         )
         
         if response.status_code == 200:
