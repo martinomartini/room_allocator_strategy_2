@@ -549,57 +549,95 @@ if df is not None and not df.empty:
             st.success("🤖 **AI-Powered Search:** Ask questions in natural language! Running locally with KPMG network access.")
         else:
             st.info("ℹ️ **AI Chat is disabled on Streamlit Cloud** - KPMG Workbench API is only accessible from KPMG network.\n\n**To use AI Chat:** Download and run locally (see instructions below)")
+        
+        # Show download section on BOTH cloud and local versions
+        with st.expander("📥 Download Standalone Package", expanded=not is_running_locally()):
+            st.markdown("""
+            ### Get the Standalone Application
             
-            # Add download section for Streamlit Cloud users
-            with st.expander("📥 Download Standalone App for AI Chat", expanded=True):
-                st.markdown("""
-                ### Get Full AI Chat Functionality
-                
-                Download the standalone application to run on your local machine with KPMG network access.
-                
-                **What you'll get:**
-                - ✅ Full AI chat with natural language queries
-                - ✅ All filter tabs and features
-                - ✅ Works with KPMG Workbench API
-                - ✅ Simple double-click to launch
-                
-                **How to use:**
-                1. Click the download link below
-                2. Extract the ZIP file to your computer
-                3. Double-click `Launch_Project_Database.bat`
-                4. Browser opens automatically with full AI chat!
-                
-                **Download Link:**
-                """)
-                
-                # GitHub repository download link
-                github_repo = "martinomartini/room_allocator_strategy_2"
-                download_url = f"https://github.com/{github_repo}/archive/refs/heads/main.zip"
-                
-                st.link_button(
-                    "⬇️ Download Standalone App (ZIP)",
-                    download_url,
-                    type="primary",
-                    use_container_width=True
-                )
-                
-                st.markdown("""
-                ---
-                **Quick Start:**
-                ```
-                1. Extract ZIP file
-                2. Double-click: Launch_Project_Database.bat
-                3. Enter password: bud123
-                4. Use AI Chat!
-                ```
-                
-                **Requirements:**
-                - Windows PC
-                - KPMG network access (VPN or on-premises)
-                - Python + Streamlit (usually already installed)
-                
-                **Need help?** Contact IT support for Python/Streamlit installation.
-                """)
+            Download this application to share with colleagues or run on other machines.
+            
+            **What's included:**
+            - ✅ Full AI chat with natural language queries
+            - ✅ All filter tabs and features
+            - ✅ Simple double-click launcher
+            - ✅ Complete project database
+            
+            **How to use:**
+            1. Click the download button below
+            2. Extract the ZIP file to your computer
+            3. Double-click `Launch_Project_Database.bat`
+            4. Browser opens automatically with full features!
+            """)
+            
+            # GitHub repository download link
+            github_repo = "martinomartini/room_allocator_strategy_2"
+            download_url = f"https://github.com/{github_repo}/archive/refs/heads/main.zip"
+            
+            st.link_button(
+                "⬇️ Download Complete Package (ZIP from GitHub)",
+                download_url,
+                type="primary",
+                use_container_width=True
+            )
+            
+            # Also provide direct file downloads
+            st.markdown("---")
+            st.markdown("**Or download individual files:**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Download BAT file
+                try:
+                    bat_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Launch_Project_Database.bat")
+                    if os.path.exists(bat_file_path):
+                        with open(bat_file_path, 'r') as f:
+                            bat_content = f.read()
+                        st.download_button(
+                            label="📄 Launch_Project_Database.bat",
+                            data=bat_content,
+                            file_name="Launch_Project_Database.bat",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                except:
+                    pass
+            
+            with col2:
+                # Download Excel file
+                try:
+                    excel_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "credentials_full.xlsx")
+                    if os.path.exists(excel_path):
+                        with open(excel_path, 'rb') as f:
+                            excel_content = f.read()
+                        st.download_button(
+                            label="📊 credentials_full.xlsx",
+                            data=excel_content,
+                            file_name="credentials_full.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                except:
+                    pass
+            
+            st.markdown("""
+            ---
+            **Quick Start Guide:**
+            ```
+            1. Extract all files to a folder
+            2. Double-click: Launch_Project_Database.bat
+            3. Enter password: bud123
+            4. Use AI Chat and all features!
+            ```
+            
+            **Requirements:**
+            - Windows PC
+            - KPMG network access (VPN or on-premises) for AI Chat
+            - Python + Streamlit (if not installed: `pip install streamlit pandas openpyxl plotly requests`)
+            
+            **Share with colleagues:** Just send them the ZIP file!
+            """)
         
         st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
