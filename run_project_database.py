@@ -34,7 +34,7 @@ if __name__ == '__main__':
     sys.argv = [
         "streamlit",
         "run",
-        "app_standalone.py",
+        "project_database_standalone.py",
         "--server.headless=true",
         "--server.port=8501",
         "--browser.gatherUsageStats=false"

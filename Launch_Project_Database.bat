@@ -11,7 +11,7 @@ echo Starting application...
 echo.
 
 REM Start Streamlit standalone app in background
-start /B streamlit run "%~dp0app_standalone.py" --server.headless=true --browser.gatherUsageStats=false
+start /B streamlit run "%~dp0project_database_standalone.py" --server.headless=true --browser.gatherUsageStats=false
 
 REM Wait a moment for server to start
 timeout /t 3 /nobreak >nul
