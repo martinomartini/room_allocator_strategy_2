@@ -331,8 +331,11 @@ Return ONLY valid JSON, no other text."""
         elif response.status_code == 401:
             # Invalid API key
             return None
+        elif response.status_code == 403:
+            # Access forbidden - likely IP allowlisting issue
+            return None
         else:
-            st.error(f"API Error {response.status_code}: {response.text}")
+            # Return None for any other error to trigger the friendly message
             return None
             
     except Exception as e:
