@@ -662,23 +662,6 @@ if df is not None and not df.empty:
             """)
         
         st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
-            **Quick Start Guide:**
-            ```
-            1. Extract all files to a folder
-            2. Double-click: Launch_Project_Database.bat
-            3. Enter password: bud123
-            4. Use AI Chat and all features!
-            ```
-            
-            **Requirements:**
-            - Windows PC
-            - KPMG network access (VPN or on-premises) for AI Chat
-            - Python + Streamlit (if not installed: `pip install streamlit pandas openpyxl plotly requests`)
-            
-            **Share with colleagues:** Just send them the ZIP file!
-            """)
-        
-        st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
         # Initialize chat history
         if "chat_messages" not in st.session_state:
