@@ -10,4 +10,4 @@ headless = true # Recommended for deployments
 enableCORS = false # Usually handled by Streamlit Community Cloud proxy
 
 [client]
-showSidebarNavigation = false # Hide sidebar nav if not using multi-page apps
+showSidebarNavigation = true # Enable sidebar nav for multi-page apps
