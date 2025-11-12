@@ -3,4 +3,5 @@ psycopg2-binary>=2.9.0 # For PostgreSQL connection
 pytz>=2023.3 # For timezone handling
 pandas>=1.5.0 # For displaying dataframes
 plotly>=5.0.0 # For analytics charts and visualization
+openpyxl>=3.0.0 # For reading Excel files
 supabase
