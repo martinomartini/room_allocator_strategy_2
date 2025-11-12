@@ -48,14 +48,12 @@ with col3:
 # Load the Excel file
 @st.cache_data
 def load_data():
-    """Load data from Excel file in credentials folder"""
-    # Look for the Excel file in the credentials folder
-    credentials_folder = os.path.join(
+    """Load data from Excel file in repository root"""
+    # Look for the Excel file in the repository root (for Streamlit Cloud deployment)
+    excel_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        '..',
-        'credentials'
+        'test_data_credentials.xlsx'
     )
-    excel_path = os.path.join(credentials_folder, 'test_data_credentials.xlsx')
     
     try:
         df = pd.read_excel(excel_path)
