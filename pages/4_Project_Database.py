@@ -237,23 +237,12 @@ def export_to_excel(df: pd.DataFrame, filename: str = None) -> BytesIO:
         return None
 
 def call_workbench_api(user_query: str, context: str, df: pd.DataFrame, conversation_history: List[Dict] = None) -> Optional[str]:
-    """Call the workbench API to interpret the user query"""
+    """Call the workbench API to interpret the user query (only works locally on KPMG network)"""
     
-    # Check if we should use proxy (on Streamlit Cloud)
-    use_proxy = not is_running_locally()
-    
-    if use_proxy:
-        # Try to get proxy configuration from secrets
-        try:
-            proxy_url = st.secrets.get("PROXY_URL", "").strip()
-            proxy_token = st.secrets.get("PROXY_TOKEN", "").strip()
-            
-            if not proxy_url or not proxy_token:
-                # Proxy not configured - show helpful message
-                return None
-        except:
-            # Secrets not available
-            return None
+    # Check if running locally - API only works on KPMG network
+    if not is_running_locally():
+        # On Streamlit Cloud - can't reach KPMG API
+        return None
     
     # Get API config (always has default values)
     config = get_api_config()
@@ -387,24 +376,13 @@ Return ONLY valid JSON, no other text."""
             "temperature": 0.3
         }
         
-        # Choose endpoint based on environment
-        if use_proxy:
-            # Use proxy server when on Streamlit Cloud
-            endpoint_url = f"{proxy_url}/api/chat"
-            headers = {
-                'Authorization': f'Bearer {proxy_token}',
-                'Content-Type': 'application/json'
-            }
-            session = requests  # Use regular requests for proxy
-        else:
-            # Direct connection when running locally
-            endpoint_url = API_URL
-            headers = get_api_headers()
-            session = get_persistent_session()
+        # Use persistent session and headers for direct KPMG API connection
+        session = get_persistent_session()
+        headers = get_api_headers()
         
         # Perform the request
         response = session.post(
-            endpoint_url,
+            API_URL,
             headers=headers,
             json=body,
             timeout=30,
@@ -421,15 +399,14 @@ Return ONLY valid JSON, no other text."""
                 'status_code': response.status_code,
                 'reason': response.reason,
                 'headers': dict(response.headers),
-                'body': response.text[:500] if response.text else 'No body',
-                'using_proxy': use_proxy
+                'body': response.text[:500] if response.text else 'No body'
             }
             st.session_state.api_debug.append(error_info)
             
             # Show detailed error in expander
             st.error(f"API returned status code: {response.status_code} - {response.reason}")
             with st.expander("🔍 Debug Information (Click to expand)"):
-                st.write("**Using Proxy:**", "Yes (via local proxy server)" if use_proxy else "No (direct KPMG API)")
+                st.write("**Connection:**", "Direct to KPMG API")
                 st.write("**Status Code:**", response.status_code)
                 st.write("**Reason:**", response.reason)
                 st.write("**Response Body (first 500 chars):**")
@@ -571,7 +548,7 @@ if df is not None and not df.empty:
         if is_running_locally():
             st.success("🤖 **AI-Powered Search:** Ask questions in natural language! Running locally with KPMG network access.")
         else:
-            st.warning("🤖 **AI Chat:** Requires KPMG network. Run locally (`streamlit run app.py`) to enable. Other tabs work perfectly!")
+            st.info("ℹ️ **AI Chat is disabled on Streamlit Cloud** - KPMG Workbench API is only accessible from KPMG network.\n\n**To use AI Chat:** Run locally with `streamlit run app.py` (all other tabs work perfectly!)")
         st.caption("Examples: 'Show me all projects in technology', 'Give me all projects of Tim Kramer', 'All projects from 2024'")
         
         # Initialize chat history
@@ -591,13 +568,17 @@ if df is not None and not df.empty:
                     st.dataframe(results_df, use_container_width=True)
                     st.caption(f"Found {len(results_df)} project(s)")
         
-        # Chat input
-        if prompt := st.chat_input("Ask about projects..."):
-            # Add user message to history
-            st.session_state.chat_messages.append({"role": "user", "content": prompt})
-            # Add to conversation context for API
-            st.session_state.conversation_context.append({"role": "user", "content": prompt})
-            st.rerun()
+        # Chat input - only enable if running locally
+        if is_running_locally():
+            if prompt := st.chat_input("Ask about projects..."):
+                # Add user message to history
+                st.session_state.chat_messages.append({"role": "user", "content": prompt})
+                # Add to conversation context for API
+                st.session_state.conversation_context.append({"role": "user", "content": prompt})
+                st.rerun()
+        else:
+            # Show disabled input on Streamlit Cloud
+            st.chat_input("AI Chat disabled on Streamlit Cloud - Run locally to enable", disabled=True)
         
         # Process the last message if it's a user message without a response
         # Check if the last message needs a response
