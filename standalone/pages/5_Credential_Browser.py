@@ -163,7 +163,7 @@ if df is not None and not df.empty:
                 # Display dataframe
                 st.dataframe(
                     person_projects[display_columns],
-                    width="stretch",
+                    use_container_width=True,
                     height=400
                 )
                 
@@ -268,7 +268,7 @@ if df is not None and not df.empty:
             
             st.dataframe(
                 filtered_df[display_columns],
-                width="stretch",
+                use_container_width=True,
                 height=400
             )
             

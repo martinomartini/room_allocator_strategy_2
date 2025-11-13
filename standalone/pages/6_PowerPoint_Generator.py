@@ -638,7 +638,7 @@ if df is not None and not df.empty:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if "dataframe" in message and message["dataframe"] is not None:
-                st.dataframe(message["dataframe"], width="stretch")
+                st.dataframe(message["dataframe"], use_container_width=True)
             if "download_data" in message:
                 st.download_button(
                     label="📥 Download PowerPoint",
