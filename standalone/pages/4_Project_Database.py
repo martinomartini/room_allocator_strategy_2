@@ -174,17 +174,23 @@ with col3:
 @st.cache_data
 def load_data_from_excel():
     """Load data from Excel file"""
-    excel_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'credentials_full.xlsx'
-    )
-    try:
-        df = pd.read_excel(excel_path)
-        return df
-    except FileNotFoundError:
-        return None
-    except Exception as e:
-        return None
+    # Try multiple paths for the Excel file
+    possible_paths = [
+        'credentials_full.xlsx',  # Same directory as app.py
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'credentials_full.xlsx'),  # Original
+        os.path.join(os.path.dirname(__file__), '..', 'credentials_full.xlsx'),  # Parent directory
+        os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx')  # Pages directory
+    ]
+    
+    for excel_path in possible_paths:
+        try:
+            if os.path.exists(excel_path):
+                df = pd.read_excel(excel_path)
+                return df
+        except Exception:
+            continue
+    
+    return None
 
 def get_column_mapping(df: pd.DataFrame) -> Dict[str, str]:
     """Create a mapping of common terms to actual column names"""

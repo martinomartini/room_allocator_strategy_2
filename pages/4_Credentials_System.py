@@ -26,7 +26,7 @@ with col2:
     bat_content = """@echo off
 REM ============================================
 REM  KPMG Credentials Management System
-REM  Automatic Installer and Launcher
+REM  Self-Installing Launcher
 REM ============================================
 
 echo.
@@ -53,7 +53,7 @@ if errorlevel 1 (
 echo [OK] Python found
 echo.
 
-REM Create a temporary directory for the application
+REM Create application directory
 set "APP_DIR=%USERPROFILE%\\KPMG_Credentials_System"
 if not exist "%APP_DIR%" (
     echo Creating application directory...
@@ -62,15 +62,16 @@ if not exist "%APP_DIR%" (
     mkdir "%APP_DIR%\\.streamlit"
 )
 
-echo [OK] Application directory ready
+echo [OK] Application directory ready: %APP_DIR%
 echo.
 
 REM Download files from GitHub
-echo Downloading application files...
+echo Downloading application files from GitHub...
 echo This may take a moment...
 echo.
 
-curl -L -o "%APP_DIR%\\credentials.zip" "https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip"
+REM Download the entire repository as ZIP
+curl -L -o "%APP_DIR%\\temp.zip" "https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip" 2>nul
 
 if errorlevel 1 (
     echo [ERROR] Failed to download files. Please check your internet connection.
@@ -81,25 +82,29 @@ if errorlevel 1 (
 echo [OK] Files downloaded
 echo.
 
-REM Extract the standalone folder
+REM Extract only the standalone folder
 echo Extracting files...
-powershell -Command "Expand-Archive -Path '%APP_DIR%\\credentials.zip' -DestinationPath '%APP_DIR%' -Force"
-xcopy /E /I /Y "%APP_DIR%\\room_allocator_strategy_2-main\\standalone\\*" "%APP_DIR%"
-del "%APP_DIR%\\credentials.zip"
-rmdir /S /Q "%APP_DIR%\\room_allocator_strategy_2-main"
+powershell -Command "Expand-Archive -Path '%APP_DIR%\\temp.zip' -DestinationPath '%APP_DIR%\\temp' -Force" 2>nul
 
-echo [OK] Files extracted
+REM Copy standalone folder contents to APP_DIR
+xcopy /E /I /Y "%APP_DIR%\\temp\\room_allocator_strategy_2-main\\standalone\\*" "%APP_DIR%" >nul
+
+REM Cleanup
+del "%APP_DIR%\\temp.zip" >nul 2>&1
+rmdir /S /Q "%APP_DIR%\\temp" >nul 2>&1
+
+echo [OK] Files extracted and ready
 echo.
 
-REM Check if required packages are installed
-echo Checking dependencies...
+REM Check and install dependencies
+echo Checking Python dependencies...
 python -c "import streamlit" >nul 2>&1
 if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
-    python -m pip install --upgrade pip
-    python -m pip install streamlit pandas openpyxl plotly requests python-pptx
+    python -m pip install --quiet --upgrade pip
+    python -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
     echo.
     echo [OK] Dependencies installed successfully!
     echo.
@@ -114,12 +119,13 @@ echo  Starting Credentials System...
 echo =============================================
 echo.
 echo The application will open in your browser shortly.
-echo Password: bud123
+echo Password for all tools: bud123
 echo.
-echo To stop the application: Close this window or press Ctrl+C
+echo To stop: Close this window or press Ctrl+C
 echo =============================================
 echo.
 
+REM Change to app directory and start Streamlit
 cd /d "%APP_DIR%"
 python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
 
@@ -143,7 +149,8 @@ pause
     **What you get:**
     - ✅ Self-installing application
     - ✅ All 3 AI-powered tools
-    - ✅ Automatic file download & setup
+    - ✅ Automatic file download from GitHub
+    - ✅ Automatic dependency installation
     - ✅ No manual setup required!
     """)
     
@@ -152,16 +159,17 @@ pause
     1. Click the download button above
     2. Save the `.bat` file anywhere
     3. Double-click the downloaded file
-    4. Wait for automatic setup (downloads & installs everything)
-    5. Enter password: **bud123**
+    4. Wait for automatic setup (downloads everything & installs dependencies)
+    5. Application opens in browser automatically
+    6. Enter password: **bud123**
     
     **Requirements:**
     - Windows PC
     - Python 3.8+ ([Download here](https://www.python.org/downloads/) if needed)
-    - Internet connection (for first-time setup)
-    - KPMG network access for AI features
+    - Internet connection (for initial download)
+    - KPMG network access (VPN or on-premises) for AI features
     
-    💡 The launcher will automatically download all files and install dependencies!
+    💡 The launcher automatically downloads all files from GitHub and installs everything!
     """)
 
 st.markdown("---")

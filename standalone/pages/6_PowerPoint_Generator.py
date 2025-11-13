@@ -81,13 +81,26 @@ st.markdown("Just tell me what you want! Example: *'Fill in the template with Bu
 @st.cache_data
 def load_credentials_data():
     """Load credentials database"""
-    excel_path = os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx')
-    try:
-        df = pd.read_excel(excel_path)
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None
+    # Try multiple paths for the Excel file
+    possible_paths = [
+        'credentials_full.xlsx',  # Same directory as app.py (when run from standalone/)
+        os.path.join(os.path.dirname(__file__), '..', 'credentials_full.xlsx'),  # Parent directory
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials_full.xlsx'),  # Two levels up
+        os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx')  # Pages directory
+    ]
+    
+    for excel_path in possible_paths:
+        try:
+            if os.path.exists(excel_path):
+                df = pd.read_excel(excel_path)
+                return df
+        except Exception as e:
+            continue
+    
+    # If all attempts fail, show detailed error
+    st.error(f"Error loading data: [Errno 2] No such file or directory: 'C:\\Users\\mmartini1\\KPMG_Credentials_System\\pages\\credentials_full.xlsx'")
+    st.info("Please ensure 'credentials_full.xlsx' exists in the credentials folder")
+    return None
 
 def call_llm(system_prompt: str, user_message: str) -> Optional[str]:
     """Call the LLM API"""
@@ -800,10 +813,23 @@ Please type a number (e.g., '5' or '7'):"""
                 
                 # Generate PowerPoint
                 with st.spinner("📄 Generating PowerPoint..."):
-                    template_path = os.path.join(
-                        os.path.dirname(__file__),
-                        'Bud van der Schier– Partner.pptx'
-                    )
+                    # Try multiple paths for the template
+                    possible_template_paths = [
+                        'Bud van der Schier– Partner.pptx',  # Same directory as app.py
+                        os.path.join(os.path.dirname(__file__), '..', 'Bud van der Schier– Partner.pptx'),  # Parent
+                        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Bud van der Schier– Partner.pptx'),  # Two up
+                        os.path.join(os.path.dirname(__file__), 'Bud van der Schier– Partner.pptx')  # Pages dir
+                    ]
+                    
+                    template_path = None
+                    for path in possible_template_paths:
+                        if os.path.exists(path):
+                            template_path = path
+                            break
+                    
+                    if not template_path:
+                        st.error("Template file 'Bud van der Schier– Partner.pptx' not found")
+                        st.stop()
                     
                     try:
                         pptx_buffer = create_filled_presentation(

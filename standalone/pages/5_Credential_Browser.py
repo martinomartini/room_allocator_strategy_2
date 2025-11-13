@@ -21,13 +21,24 @@ st.markdown("Search and browse the credentials database")
 @st.cache_data
 def load_credentials_data():
     """Load credentials database"""
-    excel_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'credentials_full.xlsx')
-    try:
-        df = pd.read_excel(excel_path)
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None
+    # Try multiple paths for the Excel file
+    possible_paths = [
+        'credentials_full.xlsx',  # Same directory as app.py
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'credentials_full.xlsx'),  # Original
+        os.path.join(os.path.dirname(__file__), '..', 'credentials_full.xlsx'),  # Parent directory
+        os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx')  # Pages directory
+    ]
+    
+    for excel_path in possible_paths:
+        try:
+            if os.path.exists(excel_path):
+                df = pd.read_excel(excel_path)
+                return df
+        except Exception:
+            continue
+    
+    st.error("Error loading data: credentials_full.xlsx not found")
+    return None
 
 def find_person_projects(df: pd.DataFrame, person_name: str) -> pd.DataFrame:
     """Find all projects for a specific person"""
