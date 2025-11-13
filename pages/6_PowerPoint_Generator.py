@@ -80,13 +80,23 @@ st.markdown("Just tell me what you want! Example: *'Fill in the template with Bu
 @st.cache_data
 def load_credentials_data():
     """Load credentials database"""
-    excel_path = os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx')
-    try:
-        df = pd.read_excel(excel_path)
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None
+    # Try multiple paths - for both main app and standalone versions
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials_full.xlsx'),  # Main app (up from pages/)
+        os.path.join(os.path.dirname(__file__), 'credentials_full.xlsx'),  # Standalone (same dir as pages/)
+        'credentials_full.xlsx'  # Current directory
+    ]
+    
+    for excel_path in possible_paths:
+        if os.path.exists(excel_path):
+            try:
+                df = pd.read_excel(excel_path)
+                return df
+            except Exception as e:
+                continue
+    
+    st.error(f"Could not find credentials_full.xlsx in any expected location")
+    return None
 
 def call_llm(system_prompt: str, user_message: str) -> Optional[str]:
     """Call the LLM API"""
@@ -799,10 +809,26 @@ Please type a number (e.g., '5' or '7'):"""
                 
                 # Generate PowerPoint
                 with st.spinner("📄 Generating PowerPoint..."):
-                    template_path = os.path.join(
-                        os.path.dirname(__file__),
+                    # Try multiple paths for template
+                    template_paths = [
+                        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Bud van der Schier– Partner.pptx'),
+                        os.path.join(os.path.dirname(__file__), 'Bud van der Schier– Partner.pptx'),
                         'Bud van der Schier– Partner.pptx'
-                    )
+                    ]
+                    
+                    template_path = None
+                    for path in template_paths:
+                        if os.path.exists(path):
+                            template_path = path
+                            break
+                    
+                    if not template_path:
+                        st.error("❌ Template file not found")
+                        st.session_state.chat_history.append({
+                            "role": "assistant",
+                            "content": "❌ Template file 'Bud van der Schier– Partner.pptx' not found"
+                        })
+                        st.rerun()
                     
                     try:
                         pptx_buffer = create_filled_presentation(
