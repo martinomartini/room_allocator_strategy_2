@@ -809,7 +809,7 @@ Please type a number (e.g., '5' or '7'):"""
                 # Only show columns that exist
                 display_columns = [col for col in display_columns if col in selected_projects.columns]
                 display_df = selected_projects[display_columns]
-                st.dataframe(display_df, width="stretch")
+                st.dataframe(display_df, use_container_width=True)
                 
                 # Generate PowerPoint
                 with st.spinner("📄 Generating PowerPoint..."):
