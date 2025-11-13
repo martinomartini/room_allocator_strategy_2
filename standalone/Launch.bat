@@ -78,10 +78,13 @@ echo [OK] Python found
 "%PYTHON_CMD%" --version
 echo.
 
-REM Add Python and Scripts to PATH for this session
-for %%i in ("%PYTHON_CMD%") do set "PYTHON_DIR=%%~dpi"
-set "PYTHON_DIR=%PYTHON_DIR:~0,-1%"
-set "PATH=%PYTHON_DIR%;%PYTHON_DIR%\Scripts;%PATH%"
+REM Add Python Scripts to PATH for this session (only if using full path to python.exe)
+echo %PYTHON_CMD% | find "python.exe" >nul
+if not errorlevel 1 (
+    for %%i in ("%PYTHON_CMD%") do set "PYTHON_DIR=%%~dpi"
+    set "PYTHON_DIR=%PYTHON_DIR:~0,-1%"
+    set "PATH=%PYTHON_DIR%;%PYTHON_DIR%\Scripts;%PATH%"
+)
 
 REM Create application directory
 set "APP_DIR=%USERPROFILE%\KPMG_Credentials_System"
