@@ -181,6 +181,20 @@ echo.
 
 REM Change to app directory and start Streamlit
 cd /d "%APP_DIR%"
+
+REM Final check that streamlit is accessible
+echo Starting application with Python: %PYTHON_CMD%
+"%PYTHON_CMD%" -c "import streamlit; print('Streamlit version:', streamlit.__version__)" 2>nul
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Cannot import streamlit. Installation may have failed.
+    echo Please try running the script again or install manually:
+    echo   "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx
+    echo.
+    pause
+    exit /b 1
+)
+
 "%PYTHON_CMD%" -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
 
 REM If Streamlit exits, pause to show any errors
