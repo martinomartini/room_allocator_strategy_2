@@ -137,19 +137,19 @@ echo.
 
 REM Check and install dependencies
 echo Checking Python dependencies...
-"%PYTHON_CMD%" -c "import streamlit" >nul 2>&1
+"%PYTHON_CMD%" -m pip show streamlit >nul 2>&1
 if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
     echo Installing pip...
     "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location >nul 2>&1
-    echo Installing packages (this may show some warnings - that's normal)...
+    echo Installing packages ^(this may show some warnings - that's normal^)...
     "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx --no-warn-script-location
     echo.
     
     REM Verify streamlit was installed
-    "%PYTHON_CMD%" -c "import streamlit" >nul 2>&1
+    "%PYTHON_CMD%" -m pip show streamlit >nul 2>&1
     if errorlevel 1 (
         echo [ERROR] Failed to install Streamlit. Please check your internet connection.
         echo.
