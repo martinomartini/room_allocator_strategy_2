@@ -12,6 +12,25 @@ st.set_page_config(
     layout="wide"
 )
 
+# Password protection
+if "credentials_download_authenticated" not in st.session_state:
+    st.session_state.credentials_download_authenticated = False
+
+if not st.session_state.credentials_download_authenticated:
+    st.title("🔒 Access Credentials Download")
+    st.markdown("Please enter the password to access the credentials system download.")
+    
+    password = st.text_input("Password", type="password", key="download_password")
+    
+    if st.button("Submit", key="download_submit"):
+        if password == "bud123":
+            st.session_state.credentials_download_authenticated = True
+            st.rerun()
+        else:
+            st.error("❌ Incorrect password. Please try again.")
+    
+    st.stop()
+
 st.title("📥 Credentials Management System")
 st.markdown("One-click installer with all AI-powered tools")
 st.markdown("---")
