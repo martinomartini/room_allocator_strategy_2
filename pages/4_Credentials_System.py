@@ -80,17 +80,31 @@ if errorlevel 1 (
     
     echo [OK] Python installer downloaded
     echo.
-    echo Installing Python (this may take 3-5 minutes)...
-    echo Please wait - DO NOT CLOSE THIS WINDOW...
+    echo =============================================
+    echo  Python Installation Window Opening
+    echo =============================================
     echo.
+    echo A Python installer window will now open.
+    echo Please follow these steps:
+    echo.
+    echo 1. CHECK "Add Python to PATH" (IMPORTANT!)
+    echo 2. Click "Install Now"
+    echo 3. Wait for installation to complete
+    echo 4. Click "Close" when done
+    echo.
+    echo After installation completes, return to this window.
+    echo =============================================
+    echo.
+    pause
     
-    REM Install Python silently with PATH and wait for completion
-    start /wait "" "%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
+    REM Install Python with GUI and wait for completion
+    start /wait "" "%PYTHON_INSTALLER%" InstallAllUsers=0 PrependPath=1 Include_test=0
     
     REM Cleanup installer
     del "%PYTHON_INSTALLER%" >nul 2>&1
     
-    echo [OK] Python installed successfully!
+    echo.
+    echo [OK] Python installation completed!
     echo.
     
     REM Refresh PATH by re-reading environment
@@ -162,10 +176,10 @@ echo Checking Python dependencies...
 python -c "import streamlit" >nul 2>&1
 if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
-    echo This may take a few minutes on first run...
+    echo This may take a few minutes...
     echo.
-    python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
+    python -m pip install --upgrade pip
+    python -m pip install streamlit pandas openpyxl plotly requests python-pptx
     echo.
     echo [OK] Dependencies installed successfully!
     echo.
