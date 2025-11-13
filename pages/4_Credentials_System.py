@@ -59,13 +59,15 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Python is not installed. Installing Python automatically...
-    echo This will take a few minutes...
     echo.
     
-    REM Download Python installer
+    REM Download Python installer using PowerShell
     set "PYTHON_INSTALLER=%TEMP%\\python-installer.exe"
-    echo Downloading Python 3.11...
-    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nul
+    echo Downloading Python 3.11 installer (approx. 25 MB)...
+    echo This may take 1-2 minutes depending on your connection...
+    echo.
+    
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%PYTHON_INSTALLER%' -UseBasicParsing}"
     
     if errorlevel 1 (
         echo [ERROR] Failed to download Python installer.
@@ -78,7 +80,7 @@ if errorlevel 1 (
         exit /b 1
     )
     
-    echo [OK] Python installer downloaded
+    echo [OK] Python installer downloaded successfully!
     echo.
     echo =============================================
     echo  Python Installation Window Opening
@@ -140,13 +142,12 @@ if not exist "%APP_DIR%" (
 echo [OK] Application directory ready: %APP_DIR%
 echo.
 
-REM Download files from GitHub
+REM Download files from GitHub using PowerShell
 echo Downloading application files from GitHub...
 echo This may take a moment...
 echo.
 
-REM Download the entire repository as ZIP
-curl -L -o "%APP_DIR%\\temp.zip" "https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip" 2>nul
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip' -OutFile '%APP_DIR%\\temp.zip' -UseBasicParsing}"
 
 if errorlevel 1 (
     echo [ERROR] Failed to download files. Please check your internet connection.

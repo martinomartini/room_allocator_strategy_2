@@ -1,4 +1,4 @@
-@echo off@echo off@echo off@echo off@echo off
+@echo off@echo off@echo off@echo off@echo off@echo off
 
 REM ============================================
 
@@ -14,7 +14,7 @@ echo.REM  Self-Installing Launcher with Python Auto-Install
 
 echo =============================================
 
-echo  KPMG Credentials Management SystemREM ============================================REM  KPMG Credentials Management SystemREM ============================================REM ============================================
+echo  KPMG Credentials Management SystemREM ============================================REM  KPMG Credentials Management SystemREM ============================================
 
 echo  Automatic Installer
 
@@ -30,141 +30,308 @@ python --version >nul 2>&1echo =============================================
 
 if errorlevel 1 (
 
-    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management SystemREM ============================================REM  KPMG Credentials Management SystemREM  KPMG Credentials Management System
+    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management SystemREM ============================================REM  KPMG Credentials Management SystemREM ============================================REM ============================================
 
     echo.
 
     echo  Automatic Installer
 
-    REM Download Python installer
+    REM Download Python installer using PowerShell
 
     set "PYTHON_INSTALLER=%TEMP%\python-installer.exe"echo =============================================
 
-    echo Downloading Python 3.11 installer...
+    echo Downloading Python 3.11 installer (approx. 25 MB)...
 
-    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nulecho.
-
-    
-
-    if errorlevel 1 (echo.REM  Self-Installing LauncherREM  Automatic Launcher with Dependency Check
-
-        echo [ERROR] Failed to download Python installer.
-
-        echo Please check your internet connection and try again.REM Check if Python is installed
-
-        echo.
-
-        echo Alternatively, you can manually install Python from:python --version >nul 2>&1echo =============================================
-
-        echo https://www.python.org/downloads/
-
-        echo.if errorlevel 1 (
-
-        pause
-
-        exit /b 1    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management SystemREM ============================================REM ============================================
-
-    )
-
-        echo This will take a few minutes...
-
-    echo [OK] Python installer downloaded
-
-    echo.    echo.echo  Automatic Installer
-
-    echo =============================================
-
-    echo  Python Installation Window Opening    
-
-    echo =============================================
-
-    echo.    REM Download Python installerecho =============================================
-
-    echo A Python installer window will now open.
-
-    echo Please follow these steps:    set "PYTHON_INSTALLER=%TEMP%\python-installer.exe"
+    echo This may take 1-2 minutes depending on your connection...echo.
 
     echo.
 
-    echo 1. CHECK "Add Python to PATH" (IMPORTANT!)    echo Downloading Python 3.11...echo.
+    echo.REM  Self-Installing Launcher with Python Auto-Install
 
-    echo 2. Click "Install Now"
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%PYTHON_INSTALLER%' -UseBasicParsing}"
 
-    echo 3. Wait for installation to complete    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nul
-
-    echo 4. Click "Close" when done
-
-    echo.    echo.echo.
-
-    echo After installation completes, return to this window.
-
-    echo =============================================    if errorlevel 1 (
-
-    echo.
-
-    pause        echo [ERROR] Failed to download Python installer.REM Check if Python is installed
-
-    
-
-    REM Install Python with GUI and wait for completion        echo Please check your internet connection and try again.
-
-    start /wait "" "%PYTHON_INSTALLER%" InstallAllUsers=0 PrependPath=1 Include_test=0
-
-            echo.python --version >nul 2>&1echo =============================================echo =============================================
-
-    REM Cleanup installer
-
-    del "%PYTHON_INSTALLER%" >nul 2>&1        echo Alternatively, you can manually install Python from:
-
-    
-
-    echo.        echo https://www.python.org/downloads/if errorlevel 1 (
-
-    echo [OK] Python installation completed!
-
-    echo.        echo.
-
-    
-
-    REM Refresh PATH by re-reading environment        pause    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management Systemecho  KPMG Credentials Management System
-
-    set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts"
-
-            exit /b 1
-
-    REM Verify Python is now available
-
-    python --version >nul 2>&1    )    echo This will take a few minutes...
+    REM Check if Python is installed
 
     if errorlevel 1 (
 
-        echo [INFO] Python installed successfully!    
+        echo [ERROR] Failed to download Python installer.python --version >nul 2>&1echo =============================================
 
-        echo Please CLOSE THIS WINDOW and run the BAT file again to start the application.
+        echo Please check your internet connection and try again.
 
-        echo.    echo [OK] Python installer downloaded    echo.echo  Automatic Installerecho =============================================
+        echo.if errorlevel 1 (
 
-        pause
+        echo Alternatively, you can manually install Python from:
 
-        exit /b 0    echo.
+        echo https://www.python.org/downloads/    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management SystemREM ============================================REM  KPMG Credentials Management SystemREM  KPMG Credentials Management System
 
-    )
+        echo.
 
-        echo Installing Python (this may take 3-5 minutes)...    
+        pause    echo.
 
-    echo Python is now ready!
+        exit /b 1
 
-    echo.    echo Please wait - DO NOT CLOSE THIS WINDOW...
+    )    echo  Automatic Installer
+
+    
+
+    echo [OK] Python installer downloaded successfully!    REM Download Python installer
+
+    echo.
+
+    echo =============================================    set "PYTHON_INSTALLER=%TEMP%\python-installer.exe"echo =============================================
+
+    echo  Python Installation Window Opening
+
+    echo =============================================    echo Downloading Python 3.11 installer...
+
+    echo.
+
+    echo A Python installer window will now open.    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nulecho.
+
+    echo Please follow these steps:
+
+    echo.    
+
+    echo 1. CHECK "Add Python to PATH" (IMPORTANT!)
+
+    echo 2. Click "Install Now"    if errorlevel 1 (echo.REM  Self-Installing LauncherREM  Automatic Launcher with Dependency Check
+
+    echo 3. Wait for installation to complete
+
+    echo 4. Click "Close" when done        echo [ERROR] Failed to download Python installer.
+
+    echo.
+
+    echo After installation completes, return to this window.        echo Please check your internet connection and try again.REM Check if Python is installed
+
+    echo =============================================
+
+    echo.        echo.
+
+    pause
+
+            echo Alternatively, you can manually install Python from:python --version >nul 2>&1echo =============================================
+
+    REM Install Python with GUI and wait for completion
+
+    start /wait "" "%PYTHON_INSTALLER%" InstallAllUsers=0 PrependPath=1 Include_test=0        echo https://www.python.org/downloads/
+
+    
+
+    REM Cleanup installer        echo.if errorlevel 1 (
+
+    del "%PYTHON_INSTALLER%" >nul 2>&1
+
+            pause
+
+    echo.
+
+    echo [OK] Python installation completed!        exit /b 1    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management SystemREM ============================================REM ============================================
+
+    echo.
+
+        )
+
+    REM Refresh PATH by re-reading environment
+
+    set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts"        echo This will take a few minutes...
+
+    
+
+    REM Verify Python is now available    echo [OK] Python installer downloaded
+
+    python --version >nul 2>&1
+
+    if errorlevel 1 (    echo.    echo.echo  Automatic Installer
+
+        echo [INFO] Python installed successfully!
+
+        echo Please CLOSE THIS WINDOW and run the BAT file again to start the application.    echo =============================================
+
+        echo.
+
+        pause    echo  Python Installation Window Opening    
+
+        exit /b 0
+
+    )    echo =============================================
+
+    
+
+    echo Python is now ready!    echo.    REM Download Python installerecho =============================================
+
+    echo.
+
+)    echo A Python installer window will now open.
+
+
+
+echo [OK] Python found    echo Please follow these steps:    set "PYTHON_INSTALLER=%TEMP%\python-installer.exe"
+
+python --version
+
+echo.    echo.
+
+
+
+REM Create application directory    echo 1. CHECK "Add Python to PATH" (IMPORTANT!)    echo Downloading Python 3.11...echo.
+
+set "APP_DIR=%USERPROFILE%\KPMG_Credentials_System"
+
+if not exist "%APP_DIR%" (    echo 2. Click "Install Now"
+
+    echo Creating application directory...
+
+    mkdir "%APP_DIR%"    echo 3. Wait for installation to complete    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nul
+
+    mkdir "%APP_DIR%\pages"
+
+    mkdir "%APP_DIR%\.streamlit"    echo 4. Click "Close" when done
 
 )
 
-    echo.    REM Download Python installerecho =============================================echo.
+    echo.    echo.echo.
+
+echo [OK] Application directory ready: %APP_DIR%
+
+echo.    echo After installation completes, return to this window.
+
+
+
+REM Download files from GitHub using PowerShell    echo =============================================    if errorlevel 1 (
+
+echo Downloading application files from GitHub...
+
+echo This may take a moment...    echo.
+
+echo.
+
+    pause        echo [ERROR] Failed to download Python installer.REM Check if Python is installed
+
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip' -OutFile '%APP_DIR%\temp.zip' -UseBasicParsing}"
+
+    
+
+if errorlevel 1 (
+
+    echo [ERROR] Failed to download files. Please check your internet connection.    REM Install Python with GUI and wait for completion        echo Please check your internet connection and try again.
+
+    pause
+
+    exit /b 1    start /wait "" "%PYTHON_INSTALLER%" InstallAllUsers=0 PrependPath=1 Include_test=0
+
+)
+
+            echo.python --version >nul 2>&1echo =============================================echo =============================================
+
+echo [OK] Files downloaded
+
+echo.    REM Cleanup installer
+
+
+
+REM Extract only the standalone folder    del "%PYTHON_INSTALLER%" >nul 2>&1        echo Alternatively, you can manually install Python from:
+
+echo Extracting files...
+
+powershell -Command "Expand-Archive -Path '%APP_DIR%\temp.zip' -DestinationPath '%APP_DIR%\temp' -Force" 2>nul    
+
+
+
+REM Copy standalone folder contents to APP_DIR    echo.        echo https://www.python.org/downloads/if errorlevel 1 (
+
+xcopy /E /I /Y "%APP_DIR%\temp\room_allocator_strategy_2-main\standalone\*" "%APP_DIR%" >nul
+
+    echo [OK] Python installation completed!
+
+REM Cleanup
+
+del "%APP_DIR%\temp.zip" >nul 2>&1    echo.        echo.
+
+rmdir /S /Q "%APP_DIR%\temp" >nul 2>&1
+
+    
+
+echo [OK] Files extracted and ready
+
+echo.    REM Refresh PATH by re-reading environment        pause    echo [INFO] Python is not installed. Installing Python automatically...echo  KPMG Credentials Management Systemecho  KPMG Credentials Management System
+
+
+
+REM Check and install dependencies    set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts"
+
+echo Checking Python dependencies...
+
+python -c "import streamlit" >nul 2>&1            exit /b 1
+
+if errorlevel 1 (
+
+    echo [INSTALLING] Required packages not found. Installing now...    REM Verify Python is now available
+
+    echo This may take a few minutes...
+
+    echo.    python --version >nul 2>&1    )    echo This will take a few minutes...
+
+    python -m pip install --upgrade pip
+
+    python -m pip install streamlit pandas openpyxl plotly requests python-pptx    if errorlevel 1 (
+
+    echo.
+
+    echo [OK] Dependencies installed successfully!        echo [INFO] Python installed successfully!    
+
+    echo.
+
+) else (        echo Please CLOSE THIS WINDOW and run the BAT file again to start the application.
+
+    echo [OK] All dependencies found
+
+    echo.        echo.    echo [OK] Python installer downloaded    echo.echo  Automatic Installerecho =============================================
+
+)
+
+        pause
+
+REM Start the application
+
+echo =============================================        exit /b 0    echo.
+
+echo  Starting Credentials System...
+
+echo =============================================    )
+
+echo.
+
+echo The application will open in your browser shortly.        echo Installing Python (this may take 3-5 minutes)...    
+
+echo Password for all tools: bud123
+
+echo.    echo Python is now ready!
+
+echo To stop: Close this window or press Ctrl+C
+
+echo =============================================    echo.    echo Please wait - DO NOT CLOSE THIS WINDOW...
+
+echo.
+
+)
+
+REM Change to app directory and start Streamlit
+
+cd /d "%APP_DIR%"    echo.    REM Download Python installerecho =============================================echo.
+
+python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
 
 echo [OK] Python found
 
-python --version    
+REM If Streamlit exits, pause to show any errors
 
-echo.
+echo.python --version    
+
+echo Application stopped.
+
+pauseecho.
+
 
     REM Install Python silently with PATH and wait for completion    set "PYTHON_INSTALLER=%TEMP%\python-installer.exe"
 
