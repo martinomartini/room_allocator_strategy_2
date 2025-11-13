@@ -45,7 +45,7 @@ with col2:
     bat_content = """@echo off
 REM ============================================
 REM  KPMG Credentials Management System
-REM  Self-Installing Launcher
+REM  Self-Installing Launcher with Python Auto-Install
 REM ============================================
 
 echo.
@@ -58,18 +58,61 @@ echo.
 REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python is not installed!
+    echo [INFO] Python is not installed. Installing Python automatically...
+    echo This will take a few minutes...
     echo.
-    echo Please install Python 3.8 or higher from:
-    echo https://www.python.org/downloads/
+    
+    REM Download Python installer
+    set "PYTHON_INSTALLER=%TEMP%\\python-installer.exe"
+    echo Downloading Python 3.11...
+    curl -L -o "%PYTHON_INSTALLER%" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" 2>nul
+    
+    if errorlevel 1 (
+        echo [ERROR] Failed to download Python installer.
+        echo Please check your internet connection and try again.
+        echo.
+        echo Alternatively, you can manually install Python from:
+        echo https://www.python.org/downloads/
+        echo.
+        pause
+        exit /b 1
+    )
+    
+    echo [OK] Python installer downloaded
     echo.
-    echo Make sure to check "Add Python to PATH" during installation.
+    echo Installing Python (this may take 3-5 minutes)...
+    echo Please wait...
     echo.
-    pause
-    exit /b 1
+    
+    REM Install Python silently with PATH
+    "%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
+    
+    REM Wait for installation to complete
+    timeout /t 10 /nobreak >nul
+    
+    REM Cleanup installer
+    del "%PYTHON_INSTALLER%" >nul 2>&1
+    
+    echo [OK] Python installed successfully!
+    echo.
+    echo Refreshing environment variables...
+    
+    REM Refresh PATH by re-reading environment
+    set "PATH=%PATH%;%LOCALAPPDATA%\\Programs\\Python\\Python311;%LOCALAPPDATA%\\Programs\\Python\\Python311\\Scripts"
+    
+    REM Verify Python is now available
+    python --version >nul 2>&1
+    if errorlevel 1 (
+        echo [WARNING] Python installed but not yet in PATH.
+        echo Please close this window and run the BAT file again.
+        echo.
+        pause
+        exit /b 0
+    )
 )
 
 echo [OK] Python found
+python --version
 echo.
 
 REM Create application directory
@@ -168,9 +211,10 @@ pause
     **What you get:**
     - ✅ Self-installing application
     - ✅ All 3 AI-powered tools
+    - ✅ Automatic Python installation (if needed)
     - ✅ Automatic file download from GitHub
     - ✅ Automatic dependency installation
-    - ✅ No manual setup required!
+    - ✅ Zero manual setup required!
     """)
     
     st.markdown("""
@@ -178,17 +222,19 @@ pause
     1. Click the download button above
     2. Save the `.bat` file anywhere
     3. Double-click the downloaded file
-    4. Wait for automatic setup (downloads everything & installs dependencies)
+    4. Wait for automatic setup:
+       - Installs Python if not found (3-5 minutes)
+       - Downloads all files from GitHub
+       - Installs all dependencies
     5. Application opens in browser automatically
     6. Enter password: **bud123**
     
     **Requirements:**
     - Windows PC
-    - Python 3.8+ ([Download here](https://www.python.org/downloads/) if needed)
-    - Internet connection (for initial download)
+    - Internet connection (for downloads)
     - KPMG network access (VPN or on-premises) for AI features
     
-    💡 The launcher automatically downloads all files from GitHub and installs everything!
+    💡 **No Python needed!** The launcher will install Python automatically if it's not found.
     """)
 
 st.markdown("---")
