@@ -6,4 +6,5 @@ plotly>=5.0.0 # For analytics charts and visualization
 openpyxl>=3.0.0 # For reading Excel files
 requests>=2.31.0 # For API calls
 urllib3>=1.26.0 # For advanced HTTP features (retry logic)
+python-pptx>=0.6.21 # For PowerPoint generation (Credentials Manager)
 supabase
