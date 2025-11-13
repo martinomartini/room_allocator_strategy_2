@@ -81,21 +81,17 @@ if errorlevel 1 (
     echo [OK] Python installer downloaded
     echo.
     echo Installing Python (this may take 3-5 minutes)...
-    echo Please wait...
+    echo Please wait - DO NOT CLOSE THIS WINDOW...
     echo.
     
-    REM Install Python silently with PATH
-    "%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
-    
-    REM Wait for installation to complete
-    timeout /t 10 /nobreak >nul
+    REM Install Python silently with PATH and wait for completion
+    start /wait "" "%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
     
     REM Cleanup installer
     del "%PYTHON_INSTALLER%" >nul 2>&1
     
     echo [OK] Python installed successfully!
     echo.
-    echo Refreshing environment variables...
     
     REM Refresh PATH by re-reading environment
     set "PATH=%PATH%;%LOCALAPPDATA%\\Programs\\Python\\Python311;%LOCALAPPDATA%\\Programs\\Python\\Python311\\Scripts"
@@ -103,12 +99,15 @@ if errorlevel 1 (
     REM Verify Python is now available
     python --version >nul 2>&1
     if errorlevel 1 (
-        echo [WARNING] Python installed but not yet in PATH.
-        echo Please close this window and run the BAT file again.
+        echo [INFO] Python installed successfully!
+        echo Please CLOSE THIS WINDOW and run the BAT file again to start the application.
         echo.
         pause
         exit /b 0
     )
+    
+    echo Python is now ready!
+    echo.
 )
 
 echo [OK] Python found
