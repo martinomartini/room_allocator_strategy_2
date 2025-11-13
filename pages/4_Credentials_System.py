@@ -1,228 +1,235 @@
-"""
-Credentials Management System - Download
-
-Download the standalone application with all three AI-powered tools.
-"""
-
 import streamlit as st
 
+# Set page config
 st.set_page_config(
     page_title="Credentials System - Download",
-    page_icon="📥",
+    page_icon="🔐",
     layout="wide"
 )
 
+# Initialize session state for authentication
+if 'credentials_authenticated' not in st.session_state:
+    st.session_state.credentials_authenticated = False
+
 # Password protection
-if "credentials_download_authenticated" not in st.session_state:
-    st.session_state.credentials_download_authenticated = False
-
-if not st.session_state.credentials_download_authenticated:
-    st.title("🔒 Access Credentials Download")
-    st.markdown("Please enter the password to access the credentials system download.")
+def check_password():
+    """Returns True if the user has entered the correct password."""
     
-    password = st.text_input("Password", type="password", key="download_password")
-    
-    if st.button("Submit", key="download_submit"):
-        if password == "bud123":
-            st.session_state.credentials_download_authenticated = True
-            st.rerun()
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["credentials_password"] == "bud123":
+            st.session_state.credentials_authenticated = True
+            del st.session_state["credentials_password"]
         else:
-            st.error("❌ Incorrect password. Please try again.")
+            st.session_state.credentials_authenticated = False
+
+    if not st.session_state.credentials_authenticated:
+        st.text_input(
+            "🔒 Enter Password", 
+            type="password", 
+            on_change=password_entered, 
+            key="credentials_password"
+        )
+        st.warning("Please enter the password to access the Credentials System Download page.")
+        return False
+    else:
+        return True
+
+# Main app
+if check_password():
+    st.title("🔐 KPMG Credentials Management System")
+    st.markdown("### Download Local Version")
     
-    st.stop()
-
-st.title("📥 Credentials Management System")
-st.markdown("One-click installer with all AI-powered tools")
-st.markdown("---")
-
-# Create columns for centered download button
-col1, col2, col3 = st.columns([1, 2, 1])
-
-with col2:
-    st.markdown("### 🚀 One-Click Download")
+    st.info("""
+    **Important:** This system is designed to run locally on your Windows PC.
+    The tools include AI-powered features that require KPMG network access.
+    """)
     
-    # Read the Launch.bat file content
-    bat_content = """@echo off
-REM ============================================
-REM  KPMG Credentials Management System
-REM  Self-Installing Launcher
-REM ============================================
-
-echo.
-echo =============================================
-echo  KPMG Credentials Management System
-echo  Automatic Installer
-echo =============================================
-echo.
-
-REM Check if Python is installed
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Python is not installed!
-    echo.
-    echo Please install Python 3.8 or higher from:
-    echo https://www.python.org/downloads/
-    echo.
-    echo Make sure to check "Add Python to PATH" during installation.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo [OK] Python found
-echo.
-
-REM Create application directory
-set "APP_DIR=%USERPROFILE%\\KPMG_Credentials_System"
-if not exist "%APP_DIR%" (
-    echo Creating application directory...
-    mkdir "%APP_DIR%"
-    mkdir "%APP_DIR%\\pages"
-    mkdir "%APP_DIR%\\.streamlit"
-)
-
-echo [OK] Application directory ready: %APP_DIR%
-echo.
-
-REM Download files from GitHub
-echo Downloading application files from GitHub...
-echo This may take a moment...
-echo.
-
-REM Download the entire repository as ZIP
-curl -L -o "%APP_DIR%\\temp.zip" "https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip" 2>nul
-
-if errorlevel 1 (
-    echo [ERROR] Failed to download files. Please check your internet connection.
-    pause
-    exit /b 1
-)
-
-echo [OK] Files downloaded
-echo.
-
-REM Extract only the standalone folder
-echo Extracting files...
-powershell -Command "Expand-Archive -Path '%APP_DIR%\\temp.zip' -DestinationPath '%APP_DIR%\\temp' -Force" 2>nul
-
-REM Copy standalone folder contents to APP_DIR
-xcopy /E /I /Y "%APP_DIR%\\temp\\room_allocator_strategy_2-main\\standalone\\*" "%APP_DIR%" >nul
-
-REM Cleanup
-del "%APP_DIR%\\temp.zip" >nul 2>&1
-rmdir /S /Q "%APP_DIR%\\temp" >nul 2>&1
-
-echo [OK] Files extracted and ready
-echo.
-
-REM Check and install dependencies
-echo Checking Python dependencies...
-python -c "import streamlit" >nul 2>&1
-if errorlevel 1 (
-    echo [INSTALLING] Required packages not found. Installing now...
-    echo This may take a few minutes on first run...
-    echo.
-    python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
-    echo.
-    echo [OK] Dependencies installed successfully!
-    echo.
-) else (
-    echo [OK] All dependencies found
-    echo.
-)
-
-REM Start the application
-echo =============================================
-echo  Starting Credentials System...
-echo =============================================
-echo.
-echo The application will open in your browser shortly.
-echo Password for all tools: bud123
-echo.
-echo To stop: Close this window or press Ctrl+C
-echo =============================================
-echo.
-
-REM Change to app directory and start Streamlit
-cd /d "%APP_DIR%"
-python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
-
-REM If Streamlit exits, pause to show any errors
-echo.
-echo Application stopped.
+    # Features section
+    st.markdown("---")
+    st.markdown("### 📦 What You'll Get")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("#### 📊 Project Database")
+        st.markdown("""
+        - AI-powered chat for project insights
+        - Search 114+ strategy projects
+        - Advanced filtering options
+        - Export capabilities
+        """)
+    
+    with col2:
+        st.markdown("#### 🔍 Credential Browser")
+        st.markdown("""
+        - Fast credential filtering
+        - Person-specific searches
+        - Project relationship mapping
+        - Interactive data views
+        """)
+    
+    with col3:
+        st.markdown("#### 🎯 PowerPoint Generator")
+        st.markdown("""
+        - AI-generated presentations
+        - Custom templates
+        - Project-specific content
+        - One-click export
+        """)
+    
+    st.markdown("---")
+    
+    # Requirements section
+    st.markdown("### ⚙️ Requirements")
+    requirements_col1, requirements_col2 = st.columns(2)
+    
+    with requirements_col1:
+        st.markdown("""
+        **System Requirements:**
+        - Windows PC
+        - Python 3.8 or higher ([Download here](https://www.python.org/downloads/))
+        - Internet connection (for initial setup)
+        - KPMG network access (for AI features)
+        """)
+    
+    with requirements_col2:
+        st.markdown("""
+        **Automatic Setup:**
+        - Downloads all files from GitHub
+        - Installs required packages automatically
+        - Sets up local environment
+        - Launches web interface
+        """)
+    
+    st.markdown("---")
+    
+    # Download section
+    st.markdown("### 📥 Download & Installation")
+    
+    # Read the BAT file content from the standalone folder
+    bat_file_path = "c:\\Users\\mmartini1\\OneDrive - KPMG\\Documents\\Python Scripts\\room_allocator_strategy_2\\standalone\\Launch.bat"
+    try:
+        with open(bat_file_path, 'r', encoding='ascii') as f:
+            bat_content = f.read()
+    except:
+        # Fallback content if file can't be read
+        bat_content = """@echo off
+REM ERROR: Could not load BAT file content
+REM Please contact support
 pause
 """
     
-    # Offer direct download of BAT file
+    # Create download button
     st.download_button(
-        label="⬇️ Download Credentials System",
+        label="⬇️ Download KPMG_Credentials_System.bat",
         data=bat_content,
         file_name="KPMG_Credentials_System.bat",
         mime="application/bat",
-        type="primary",
-        use_container_width=True
+        help="Download the launcher file to install and run the system locally"
     )
     
+    # Installation instructions
+    st.markdown("---")
+    st.markdown("### 📖 Installation Steps")
+    
+    with st.expander("**Step 1: Install Python** (if not already installed)", expanded=False):
+        st.markdown("""
+        1. Go to [python.org/downloads](https://www.python.org/downloads/)
+        2. Download Python 3.8 or higher for Windows
+        3. Run the installer
+        4. **Important:** Check the box "Add Python to PATH"
+        5. Click "Install Now"
+        6. Wait for installation to complete
+        """)
+    
+    with st.expander("**Step 2: Download the Launcher**", expanded=True):
+        st.markdown("""
+        1. Click the **"Download KPMG_Credentials_System.bat"** button above
+        2. Save the file to a location you can easily find (e.g., Desktop or Downloads)
+        3. The file is a Windows batch script that will set everything up automatically
+        """)
+    
+    with st.expander("**Step 3: Run the Launcher**", expanded=False):
+        st.markdown("""
+        1. Double-click the downloaded `KPMG_Credentials_System.bat` file
+        2. Windows may show a security warning - click "More info" then "Run anyway"
+        3. The launcher will:
+           - Check your Python installation
+           - Download all application files from GitHub
+           - Install required packages (first time only - takes 2-3 minutes)
+           - Start the local web server
+        4. Your browser will open automatically to `http://localhost:8501`
+        5. Use password: **bud123** to access all tools
+        """)
+    
+    with st.expander("**Step 4: Using the System**", expanded=False):
+        st.markdown("""
+        **After first installation:**
+        - All files are saved to: `C:\\Users\\YourUsername\\KPMG_Credentials_System`
+        - Next time, just double-click the BAT file to launch
+        - No re-download needed (unless you delete the folder)
+        - Packages are already installed (launches instantly)
+        
+        **Available tools:**
+        1. **Project Database** - AI chat and project search
+        2. **Credential Browser** - Fast filtering and person search
+        3. **PowerPoint Generator** - AI-powered presentations
+        
+        **Password for all tools:** bud123
+        
+        **To stop the system:**
+        - Close the terminal window, or
+        - Press Ctrl+C in the terminal
+        """)
+    
+    st.markdown("---")
+    
+    # Troubleshooting section
+    st.markdown("### 🔧 Troubleshooting")
+    
+    with st.expander("Common Issues & Solutions"):
+        st.markdown("""
+        **Problem: "Python is not installed" error**
+        - Solution: Install Python from [python.org](https://www.python.org/downloads/)
+        - Make sure to check "Add Python to PATH" during installation
+        
+        **Problem: Download fails**
+        - Solution: Check your internet connection
+        - Try running the BAT file again
+        - Make sure you're not behind a firewall blocking GitHub
+        
+        **Problem: Package installation fails**
+        - Solution: Open Command Prompt and run:
+          ```
+          python -m pip install --upgrade pip
+          python -m pip install streamlit pandas openpyxl plotly requests python-pptx
+          ```
+        
+        **Problem: AI features don't work**
+        - Solution: You must be on the KPMG network
+        - The system uses KPMG's internal API which requires network access
+        
+        **Problem: Browser doesn't open automatically**
+        - Solution: Manually open your browser and go to:
+          `http://localhost:8501`
+        
+        **Problem: Want to update to latest version**
+        - Solution: Delete the folder `C:\\Users\\YourUsername\\KPMG_Credentials_System`
+        - Run the BAT file again to download fresh files
+        """)
+    
+    st.markdown("---")
+    
+    # Support section
+    st.markdown("### 📞 Support")
     st.info("""
-    **What you get:**
-    - ✅ Self-installing application
-    - ✅ All 3 AI-powered tools
-    - ✅ Automatic file download from GitHub
-    - ✅ Automatic dependency installation
-    - ✅ No manual setup required!
+    **Questions or Issues?**
+    
+    Contact the development team or check the project repository for updates:
+    [github.com/martinomartini/room_allocator_strategy_2](https://github.com/martinomartini/room_allocator_strategy_2)
     """)
     
-    st.markdown("""
-    **Installation Steps:**
-    1. Click the download button above
-    2. Save the `.bat` file anywhere
-    3. Double-click the downloaded file
-    4. Wait for automatic setup (downloads everything & installs dependencies)
-    5. Application opens in browser automatically
-    6. Enter password: **bud123**
-    
-    **Requirements:**
-    - Windows PC
-    - Python 3.8+ ([Download here](https://www.python.org/downloads/) if needed)
-    - Internet connection (for initial download)
-    - KPMG network access (VPN or on-premises) for AI features
-    
-    💡 The launcher automatically downloads all files from GitHub and installs everything!
-    """)
-
-st.markdown("---")
-
-# Show what's included
-st.markdown("### 📦 Included Tools")
-col_a, col_b, col_c = st.columns(3)
-
-with col_a:
-    st.markdown("#### 📊 Project Database")
-    st.markdown("""
-    - AI chat for natural language queries
-    - Filter by industry, partner, year
-    - Export to CSV/Excel
-    - Password protected
-    """)
-
-with col_b:
-    st.markdown("#### 🔍 Credential Browser")
-    st.markdown("""
-    - Fast search and filtering
-    - Search by person name
-    - Filter by multiple criteria
-    - Quick export options
-    """)
-
-with col_c:
-    st.markdown("#### 📝 PowerPoint Generator")
-    st.markdown("""
-    - AI-powered presentations
-    - Natural language requests
-    - Smart project selection
-    - Professional output
-    """)
-
-st.markdown("---")
-st.caption("⚠️ AI features require KPMG network access (VPN or on-premises) • Password for all tools: bud123")
+    # Footer
+    st.markdown("---")
+    st.markdown("*KPMG Credentials Management System - Local Installation Package*")
