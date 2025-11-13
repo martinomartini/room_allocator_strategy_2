@@ -20,14 +20,121 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
-    # GitHub download button
-    github_repo = "martinomartini/room_allocator_strategy_2"
-    download_url = f"https://github.com/{github_repo}/archive/refs/heads/main.zip"
-    
     st.markdown("### 🚀 One-Click Download")
-    st.link_button(
-        "⬇️ Download Credentials System",
-        download_url,
+    
+    # Read the Launch.bat file content
+    bat_content = """@echo off
+REM ============================================
+REM  KPMG Credentials Management System
+REM  Automatic Installer and Launcher
+REM ============================================
+
+echo.
+echo =============================================
+echo  KPMG Credentials Management System
+echo  Automatic Installer
+echo =============================================
+echo.
+
+REM Check if Python is installed
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Python is not installed!
+    echo.
+    echo Please install Python 3.8 or higher from:
+    echo https://www.python.org/downloads/
+    echo.
+    echo Make sure to check "Add Python to PATH" during installation.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [OK] Python found
+echo.
+
+REM Create a temporary directory for the application
+set "APP_DIR=%USERPROFILE%\\KPMG_Credentials_System"
+if not exist "%APP_DIR%" (
+    echo Creating application directory...
+    mkdir "%APP_DIR%"
+    mkdir "%APP_DIR%\\pages"
+    mkdir "%APP_DIR%\\.streamlit"
+)
+
+echo [OK] Application directory ready
+echo.
+
+REM Download files from GitHub
+echo Downloading application files...
+echo This may take a moment...
+echo.
+
+curl -L -o "%APP_DIR%\\credentials.zip" "https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip"
+
+if errorlevel 1 (
+    echo [ERROR] Failed to download files. Please check your internet connection.
+    pause
+    exit /b 1
+)
+
+echo [OK] Files downloaded
+echo.
+
+REM Extract the standalone folder
+echo Extracting files...
+powershell -Command "Expand-Archive -Path '%APP_DIR%\\credentials.zip' -DestinationPath '%APP_DIR%' -Force"
+xcopy /E /I /Y "%APP_DIR%\\room_allocator_strategy_2-main\\standalone\\*" "%APP_DIR%"
+del "%APP_DIR%\\credentials.zip"
+rmdir /S /Q "%APP_DIR%\\room_allocator_strategy_2-main"
+
+echo [OK] Files extracted
+echo.
+
+REM Check if required packages are installed
+echo Checking dependencies...
+python -c "import streamlit" >nul 2>&1
+if errorlevel 1 (
+    echo [INSTALLING] Required packages not found. Installing now...
+    echo This may take a few minutes on first run...
+    echo.
+    python -m pip install --upgrade pip
+    python -m pip install streamlit pandas openpyxl plotly requests python-pptx
+    echo.
+    echo [OK] Dependencies installed successfully!
+    echo.
+) else (
+    echo [OK] All dependencies found
+    echo.
+)
+
+REM Start the application
+echo =============================================
+echo  Starting Credentials System...
+echo =============================================
+echo.
+echo The application will open in your browser shortly.
+echo Password: bud123
+echo.
+echo To stop the application: Close this window or press Ctrl+C
+echo =============================================
+echo.
+
+cd /d "%APP_DIR%"
+python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
+
+REM If Streamlit exits, pause to show any errors
+echo.
+echo Application stopped.
+pause
+"""
+    
+    # Offer direct download of BAT file
+    st.download_button(
+        label="⬇️ Download Credentials System",
+        data=bat_content,
+        file_name="KPMG_Credentials_System.bat",
+        mime="application/bat",
         type="primary",
         use_container_width=True
     )
@@ -36,24 +143,25 @@ with col2:
     **What you get:**
     - ✅ Self-installing application
     - ✅ All 3 AI-powered tools
-    - ✅ Automatic dependency installation
+    - ✅ Automatic file download & setup
     - ✅ No manual setup required!
     """)
     
     st.markdown("""
     **Installation Steps:**
-    1. Extract ZIP file
-    2. Open `room_allocator_strategy_2-main/standalone/` folder
-    3. Double-click `Launch.bat`
-    4. Wait for automatic setup (first time only)
+    1. Click the download button above
+    2. Save the `.bat` file anywhere
+    3. Double-click the downloaded file
+    4. Wait for automatic setup (downloads & installs everything)
     5. Enter password: **bud123**
     
     **Requirements:**
     - Windows PC
     - Python 3.8+ ([Download here](https://www.python.org/downloads/) if needed)
+    - Internet connection (for first-time setup)
     - KPMG network access for AI features
     
-    💡 The launcher will automatically install all dependencies on first run!
+    💡 The launcher will automatically download all files and install dependencies!
     """)
 
 st.markdown("---")
