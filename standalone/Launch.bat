@@ -27,30 +27,32 @@ if not errorlevel 1 (
     goto :python_found
 )
 
-REM Try common installation paths
-if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
-    goto :python_found
+REM Search for any Python version in %LOCALAPPDATA%\Programs\Python\
+if exist "%LOCALAPPDATA%\Programs\Python\" (
+    for /f "delims=" %%i in ('dir /b /ad "%LOCALAPPDATA%\Programs\Python\Python3*" 2^>nul') do (
+        if exist "%LOCALAPPDATA%\Programs\Python\%%i\python.exe" (
+            set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\%%i\python.exe"
+            goto :python_found
+        )
+    )
 )
 
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    goto :python_found
+REM Search for any Python version in C:\Program Files\Python\
+if exist "C:\Program Files\Python\" (
+    for /f "delims=" %%i in ('dir /b /ad "C:\Program Files\Python\Python3*" 2^>nul') do (
+        if exist "C:\Program Files\Python\%%i\python.exe" (
+            set "PYTHON_CMD=C:\Program Files\Python\%%i\python.exe"
+            goto :python_found
+        )
+    )
 )
 
-if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    goto :python_found
-)
-
-if exist "C:\Python313\python.exe" (
-    set "PYTHON_CMD=C:\Python313\python.exe"
-    goto :python_found
-)
-
-if exist "C:\Python312\python.exe" (
-    set "PYTHON_CMD=C:\Python312\python.exe"
-    goto :python_found
+REM Search for any Python version in C:\
+for /f "delims=" %%i in ('dir /b /ad "C:\Python3*" 2^>nul') do (
+    if exist "C:\%%i\python.exe" (
+        set "PYTHON_CMD=C:\%%i\python.exe"
+        goto :python_found
+    )
 )
 
 REM If we get here, Python was not found
@@ -60,6 +62,13 @@ echo Please install Python 3.8 or higher from:
 echo https://www.python.org/downloads/
 echo.
 echo Make sure to check "Add Python to PATH" during installation.
+echo.
+echo Searched locations:
+echo - python command in PATH
+echo - py launcher
+echo - %%LOCALAPPDATA%%\Programs\Python\
+echo - C:\Program Files\Python\
+echo - C:\Python3*
 echo.
 pause
 exit /b 1
