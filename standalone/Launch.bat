@@ -142,22 +142,15 @@ if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
+    echo NOTE: You may see build warnings for some packages ^(like pyarrow^).
+    echo These warnings are normal and do not affect the application.
+    echo.
     echo Installing pip...
     "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location >nul 2>&1
-    echo Installing packages ^(this may show some warnings - that's normal^)...
+    echo Installing packages...
     "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx --no-warn-script-location
     echo.
-    
-    REM Verify streamlit was installed
-    "%PYTHON_CMD%" -m pip show streamlit >nul 2>&1
-    if errorlevel 1 (
-        echo [ERROR] Failed to install Streamlit. Please check your internet connection.
-        echo.
-        pause
-        exit /b 1
-    )
-    
-    echo [OK] Dependencies installed successfully!
+    echo [OK] Package installation complete!
     echo.
 ) else (
     echo [OK] All dependencies found
@@ -182,20 +175,22 @@ echo.
 REM Change to app directory and start Streamlit
 cd /d "%APP_DIR%"
 
-REM Final check that streamlit is accessible
-echo Starting application with Python: %PYTHON_CMD%
-"%PYTHON_CMD%" -c "import streamlit; print('Streamlit version:', streamlit.__version__)" 2>nul
+REM Try to launch Streamlit
+"%PYTHON_CMD%" -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
+
+REM If we get here, Streamlit exited
 if errorlevel 1 (
     echo.
-    echo [ERROR] Cannot import streamlit. Installation may have failed.
-    echo Please try running the script again or install manually:
+    echo [ERROR] Streamlit failed to start. This might be because:
+    echo 1. Streamlit is not installed correctly
+    echo 2. Port 8501 is already in use
+    echo 3. There is an error in the application code
+    echo.
+    echo Try installing packages manually:
     echo   "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx
     echo.
     pause
-    exit /b 1
 )
-
-"%PYTHON_CMD%" -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
 
 REM If Streamlit exits, pause to show any errors
 echo.
