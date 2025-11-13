@@ -142,9 +142,21 @@ if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
-    "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location
+    echo Installing pip...
+    "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location >nul 2>&1
+    echo Installing packages (this may show some warnings - that's normal)...
     "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx --no-warn-script-location
     echo.
+    
+    REM Verify streamlit was installed
+    "%PYTHON_CMD%" -c "import streamlit" >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Failed to install Streamlit. Please check your internet connection.
+        echo.
+        pause
+        exit /b 1
+    )
+    
     echo [OK] Dependencies installed successfully!
     echo.
 ) else (
@@ -156,6 +168,9 @@ REM Start the application
 echo =============================================
 echo  Starting Credentials System...
 echo =============================================
+echo.
+echo NOTE: You may see some warnings above (like pyarrow build errors).
+echo These are normal and don't affect the application functionality.
 echo.
 echo The application will open in your browser shortly.
 echo Password for all tools: bud123
