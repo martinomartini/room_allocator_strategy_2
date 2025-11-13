@@ -146,12 +146,21 @@ if errorlevel 1 (
     echo These warnings are normal and do not affect the application.
     echo.
     echo Installing pip...
-    "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location >nul 2>&1
+    "%PYTHON_CMD%" -m pip install --upgrade pip >nul 2>&1
     echo Installing packages...
-    "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx --no-warn-script-location
+    echo This will take 2-3 minutes, please wait...
+    "%PYTHON_CMD%" -m pip install --user streamlit pandas openpyxl plotly requests python-pptx
     echo.
     echo [OK] Package installation complete!
     echo.
+    
+    REM Verify streamlit is now accessible
+    "%PYTHON_CMD%" -m pip show streamlit >nul 2>&1
+    if errorlevel 1 (
+        echo [WARNING] Streamlit may not have installed correctly.
+        echo The launcher will try to start it anyway.
+        echo.
+    )
 ) else (
     echo [OK] All dependencies found
     echo.
