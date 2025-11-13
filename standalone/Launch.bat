@@ -78,6 +78,11 @@ echo [OK] Python found
 "%PYTHON_CMD%" --version
 echo.
 
+REM Add Python and Scripts to PATH for this session
+for %%i in ("%PYTHON_CMD%") do set "PYTHON_DIR=%%~dpi"
+set "PYTHON_DIR=%PYTHON_DIR:~0,-1%"
+set "PATH=%PYTHON_DIR%;%PYTHON_DIR%\Scripts;%PATH%"
+
 REM Create application directory
 set "APP_DIR=%USERPROFILE%\KPMG_Credentials_System"
 if not exist "%APP_DIR%" (
@@ -137,8 +142,8 @@ if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
-    "%PYTHON_CMD%" -m pip install --quiet --upgrade pip
-    "%PYTHON_CMD%" -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
+    "%PYTHON_CMD%" -m pip install --upgrade pip --no-warn-script-location
+    "%PYTHON_CMD%" -m pip install streamlit pandas openpyxl plotly requests python-pptx --no-warn-script-location
     echo.
     echo [OK] Dependencies installed successfully!
     echo.
