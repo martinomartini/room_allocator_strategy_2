@@ -10,4 +10,4 @@ headless = true
 enableCORS = false
 
 [client]
-showSidebarNavigation = false
+showSidebarNavigation = true
