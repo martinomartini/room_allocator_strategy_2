@@ -108,11 +108,26 @@ if check_password():
     st.markdown("### 📥 Download & Installation")
     
     # Read the BAT file content from the standalone folder
-    bat_file_path = "c:\\Users\\mmartini1\\OneDrive - KPMG\\Documents\\Python Scripts\\room_allocator_strategy_2\\standalone\\Launch.bat"
-    try:
-        with open(bat_file_path, 'r', encoding='ascii') as f:
-            bat_content = f.read()
-    except:
+    # Try multiple paths to work in both local and cloud environments
+    import os
+    bat_content = None
+    
+    possible_paths = [
+        "standalone/Launch.bat",  # Relative path (for cloud)
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "standalone", "Launch.bat"),  # Relative to pages folder
+        "c:\\Users\\mmartini1\\OneDrive - KPMG\\Documents\\Python Scripts\\room_allocator_strategy_2\\standalone\\Launch.bat"  # Absolute path (local dev)
+    ]
+    
+    for bat_file_path in possible_paths:
+        try:
+            if os.path.exists(bat_file_path):
+                with open(bat_file_path, 'r', encoding='ascii') as f:
+                    bat_content = f.read()
+                break
+        except:
+            continue
+    
+    if bat_content is None:
         # Fallback content if file can't be read
         bat_content = """@echo off
 REM ERROR: Could not load BAT file content

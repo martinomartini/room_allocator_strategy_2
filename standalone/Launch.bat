@@ -10,22 +10,63 @@ echo  KPMG Credentials Management System
 echo =============================================
 echo.
 
-REM Check if Python is installed
+REM Check if Python is installed - try multiple locations
+set "PYTHON_CMD="
+
+REM Try python command (if in PATH)
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Python is not installed!
-    echo.
-    echo Please install Python 3.8 or higher from:
-    echo https://www.python.org/downloads/
-    echo.
-    echo Make sure to check "Add Python to PATH" during installation.
-    echo.
-    pause
-    exit /b 1
+if not errorlevel 1 (
+    set "PYTHON_CMD=python"
+    goto :python_found
 )
 
+REM Try py launcher (Windows Python Launcher)
+py --version >nul 2>&1
+if not errorlevel 1 (
+    set "PYTHON_CMD=py"
+    goto :python_found
+)
+
+REM Try common installation paths
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+    goto :python_found
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+    goto :python_found
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto :python_found
+)
+
+if exist "C:\Python313\python.exe" (
+    set "PYTHON_CMD=C:\Python313\python.exe"
+    goto :python_found
+)
+
+if exist "C:\Python312\python.exe" (
+    set "PYTHON_CMD=C:\Python312\python.exe"
+    goto :python_found
+)
+
+REM If we get here, Python was not found
+echo [ERROR] Python is not installed or not found!
+echo.
+echo Please install Python 3.8 or higher from:
+echo https://www.python.org/downloads/
+echo.
+echo Make sure to check "Add Python to PATH" during installation.
+echo.
+pause
+exit /b 1
+
+:python_found
 echo [OK] Python found
-python --version
+"%PYTHON_CMD%" --version
 echo.
 
 REM Create application directory
@@ -82,13 +123,13 @@ echo.
 
 REM Check and install dependencies
 echo Checking Python dependencies...
-python -c "import streamlit" >nul 2>&1
+"%PYTHON_CMD%" -c "import streamlit" >nul 2>&1
 if errorlevel 1 (
     echo [INSTALLING] Required packages not found. Installing now...
     echo This may take a few minutes on first run...
     echo.
-    python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
+    "%PYTHON_CMD%" -m pip install --quiet --upgrade pip
+    "%PYTHON_CMD%" -m pip install --quiet streamlit pandas openpyxl plotly requests python-pptx
     echo.
     echo [OK] Dependencies installed successfully!
     echo.
@@ -111,7 +152,7 @@ echo.
 
 REM Change to app directory and start Streamlit
 cd /d "%APP_DIR%"
-python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
+"%PYTHON_CMD%" -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false --server.port=8501 --server.address=localhost
 
 REM If Streamlit exits, pause to show any errors
 echo.
