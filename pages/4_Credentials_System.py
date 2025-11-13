@@ -65,11 +65,13 @@ if errorlevel 1 (
     set "PYTHON_INSTALLER=%TEMP%\\python-installer.exe"
     echo Downloading Python 3.11 installer (approx. 25 MB)...
     echo This may take 1-2 minutes depending on your connection...
+    echo Please wait...
     echo.
     
-    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%PYTHON_INSTALLER%' -UseBasicParsing}"
+    powershell -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%PYTHON_INSTALLER%' -UseBasicParsing; exit 0 } catch { Write-Host 'Download failed:' $_.Exception.Message; exit 1 }"
     
     if errorlevel 1 (
+        echo.
         echo [ERROR] Failed to download Python installer.
         echo Please check your internet connection and try again.
         echo.
@@ -80,6 +82,7 @@ if errorlevel 1 (
         exit /b 1
     )
     
+    echo.
     echo [OK] Python installer downloaded successfully!
     echo.
     echo =============================================
@@ -147,10 +150,12 @@ echo Downloading application files from GitHub...
 echo This may take a moment...
 echo.
 
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip' -OutFile '%APP_DIR%\\temp.zip' -UseBasicParsing}"
+powershell -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/martinomartini/room_allocator_strategy_2/archive/refs/heads/main.zip' -OutFile '%APP_DIR%\\temp.zip' -UseBasicParsing; Write-Host 'Download complete!'; exit 0 } catch { Write-Host 'Download failed:' $_.Exception.Message; exit 1 }"
 
 if errorlevel 1 (
+    echo.
     echo [ERROR] Failed to download files. Please check your internet connection.
+    echo.
     pause
     exit /b 1
 )
@@ -160,7 +165,15 @@ echo.
 
 REM Extract only the standalone folder
 echo Extracting files...
-powershell -Command "Expand-Archive -Path '%APP_DIR%\\temp.zip' -DestinationPath '%APP_DIR%\\temp' -Force" 2>nul
+powershell -Command "try { Expand-Archive -Path '%APP_DIR%\\temp.zip' -DestinationPath '%APP_DIR%\\temp' -Force; exit 0 } catch { Write-Host 'Extract failed:' $_.Exception.Message; exit 1 }"
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Failed to extract files.
+    echo.
+    pause
+    exit /b 1
+)
 
 REM Copy standalone folder contents to APP_DIR
 xcopy /E /I /Y "%APP_DIR%\\temp\\room_allocator_strategy_2-main\\standalone\\*" "%APP_DIR%" >nul
@@ -180,8 +193,16 @@ if errorlevel 1 (
     echo This may take a few minutes...
     echo.
     python -m pip install --upgrade pip
+    echo.
     python -m pip install streamlit pandas openpyxl plotly requests python-pptx
     echo.
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Failed to install dependencies.
+        echo.
+        pause
+        exit /b 1
+    )
     echo [OK] Dependencies installed successfully!
     echo.
 ) else (
